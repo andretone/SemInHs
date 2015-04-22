@@ -7,6 +7,8 @@ import Control.Monad.State
 import Control.Monad.Writer
 import System.IO
 
+import Debug.Trace
+
 --sintassi
 type Name = (String) --vei a pagina 183-184 sui tipi delle variabili, esplicitati nel nome
 
@@ -73,6 +75,45 @@ type Scope = Map.Map String Value
 mostra :: Lam.Scope -> String
 mostra scope = show (Map.toList scope)
 
+--sostituisco nel primo termine le occorrenze del terzo con il secondo
+-- body[ expression / var]
+riscrittura :: Expr -> Expr -> Expr -> Expr
+riscrittura body expr var@(Var v) =
+ case body of
+  Lit (LInt int) -> Lit (LInt int)
+  Lit (LPair lx rx) -> Lit (LPair (riscrittura lx expr var) (riscrittura rx expr var))
+  App e1 e2 -> App (riscrittura e1 expr var) (riscrittura e2 expr var)
+  Lam name e ->
+   if name == v 
+   then Lam name e
+   else Lam name (riscrittura e expr var)
+  Lam.Sum e1 e2 -> Lam.Sum (riscrittura e1 expr var) (riscrittura e2 expr var)
+  Sub e1 e2 -> Sub (riscrittura e1 expr var) (riscrittura e2 expr var)
+  Mul e1 e2 -> Mul (riscrittura e1 expr var) (riscrittura e2 expr var)
+  IfThenElse e1 e2 e3 -> IfThenElse (riscrittura e1 expr var) (riscrittura e2 expr var) (riscrittura e3 expr var)
+  Lam.First e -> Lam.First (riscrittura e expr var)
+  Second e -> Second (riscrittura e expr var)
+  LetIn n e1 e2 ->
+   (LetIn
+    n
+    (riscrittura e1 expr var)
+    (if n == v
+    then e2
+    else (riscrittura e2 expr var))
+   )
+  Fix v -> Fix (riscrittura v expr var)
+  Rec n e ->
+   if n == v
+   then Rec n e
+   else Rec n (riscrittura e expr var)
+  Var n ->
+   if n == v
+   then expr
+   else Var n
+  e -> error ("riscrittura:ERROR " ++ show e)
+  
+riscrittura _b _e _notvar = error "riscrittura su un temine non variable, non prevista"
+
 eval :: Lam.Scope -> Expr -> Eval Value
 eval env expr = case expr of
 
@@ -110,7 +151,12 @@ eval env expr = case expr of
 
   Fix v ->  eval env (App v (Lam "x" (App (Fix v) (Var "x")) ) )
   
- -- Rec ny l@(Lam nx t) -> eval env (Lam nx (eval enva t)) --problematico
+  Rec ny l@(Lam nx t) -> return 
+    (VClosure 
+     nx 
+     (riscrittura t (Rec ny l) (Var ny))
+     env
+    )
 
   Sub t1 t2 -> inc $ do
     VInt x <- eval env t1
@@ -123,12 +169,15 @@ eval env expr = case expr of
     return $ VInt (x*y)
 
   IfThenElse b t1 t2 -> inc $ do
-    VInt v <- eval env b --per ora usiamo gli int
-    case v of
-      0 -> 
+    value <- eval env b --per ora usiamo gli int
+    case value of
+     VInt v -> 
+      case v of
+       0 -> 
         eval env t1
-      _ ->
+       _ ->
         eval env t2
+     result -> error ("IFTHENELSE: ERRO on" ++ (show $ IfThenElse b t1 t2))
 
   Lam.First a -> inc $ do
     VPair f s <- eval env a --casini se non c'è un pair!!
@@ -181,7 +230,12 @@ vClosure2expr (Fix expr) env = (Fix (vClosure2expr expr env))
 vClosure2expr expr scope = expr
 
 --TESTS
-main = putStrLn $ show $ v2e $ fst $ runEval anothertest
+main =  do
+ putStrLn $ show provaRec
+ putStrLn $ show $ fst $ runEval (App (provaRec ) (Lit (LInt 9)))
+
+main' = putStrLn $ show $ v2e $ fst $ runEval anothertest 
+
 
 anothertest =(Lam "q" (App (Lam "a" (Lam "b" (App (Var "b") (Var "a")))) (App (Lam "z" (Lam "c" (Var "c"))) (Lit (LInt 1)) ) ) )
 
@@ -258,3 +312,5 @@ t3 = ( LetIn
 fact' = (Lam "rec" (Lam "n" (IfThenElse (Var "n") (Lit (LInt 1)) (Mul (Var "n") (App (Var "rec") (Sub (Var "n") (Lit(LInt 1))))))))
 
 testrec = App (Fix $ fact') (Lit (LInt 10))
+
+provaRec = (Rec "rec" (Lam "x" (IfThenElse (Var "x") (Lit (LInt 1)) (Mul(Var "x")(App (Var "rec")(Sub (Var "x")(Lit(LInt 1))))) )))
