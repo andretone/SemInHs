@@ -70,6 +70,7 @@ denote (IfThenElse t0 t1 t2 ) = \e -> cond (denote t0 e) (denote t1 e) (denote t
   cond z0 z1 z2 = case z0 of
    Just (VI 0) -> z1
    Just (VI _) -> z2
+   Nothing -> Nothing
    _ -> error "invalid condition IfThEl"
 
 denote (Lit (LPair t1 t2)) = \e -> liftedPair (denote t1 e) (denote t2 e)
@@ -93,23 +94,51 @@ denote (Lam x t) = \e ->
 
 denote (App t1 t2) = \e -> 
  let fi = denote t1 e
-     Just v  = denote t2 e
+     dv  = denote t2 e
  in case fi of
-  Just (VF fun) -> fun v
+  Just (VF fun) -> 
+   case dv of
+    Just v -> fun v
+    Nothing -> Nothing
+  Nothing -> Nothing
   _ -> error "bad application"
 
 denote (LetIn x t1 t2) = \e ->
- let Just v = denote t1 e --verificare correttezza di ciò, siamo eager, magari giusto così, 
+ let dv = denote t1 e --verificare correttezza di ciò, siamo eager, magari giusto così, 
 --altrimenti con case? forzerebbe l'esecuzione, potrebbe anche starci
- in  (denote t2 (modifyEnv v x e) )
+ in
+  case dv of
+   Just v -> (denote t2 (modifyEnv v x e) )
+   Nothing -> Nothing
 
-denote (Rec y (Lam x t)) = \e ->
- Just 
-  muuu $ fi (\v -> (denote t (modifyEnv v x (modifyEnv fi y e))))
+denote (Rec y (Lam x t)) = (denote (Lam x (tii)))
+ where 
+  tii = riscrivi t (Var y) (Rec y (Lam x t))
+ --riscirve le occorrenze del secondo termine nel primo con il terzo
+ --per ora supponiamo che il secondo termine sia solo una var
+  riscrivi :: Expr -> Expr -> Expr -> Expr
+  riscrivi t y@(Var ny) v =
+   case t of
+    Var name -> if Var name == y then v else Var name
+    Lit (LInt n) -> Lit (LInt n)
+    Lit (LPair e1 e2) -> Lit (LPair (riscrivi e1 y v) (riscrivi e2 y v) )
+    App e1 e2 -> App (riscrivi e1 y v) (riscrivi e2 y v)
+    Lam name expr -> if name == ny then Lam name expr else Lam name (riscrivi expr y v)
+    Sum e1 e2 -> Sum (riscrivi e1 y v) (riscrivi e2 y v)
+    Sub e1 e2 -> Sub (riscrivi e1 y v) (riscrivi e2 y v)
+    Mul e1 e2 -> Mul (riscrivi e1 y v) (riscrivi e2 y v) 
+    IfThenElse e0 e1 e2 -> IfThenElse (riscrivi e0 y v) (riscrivi e1 y v) (riscrivi e2 y v)
+    First expr -> First (riscrivi expr y v)
+    Second expr -> Second (riscrivi expr y v)
+    LetIn name e1 e2 -> if name == ny then LetIn name e1 e2 else LetIn name (riscrivi e1 y v) (riscrivi e2 y v)
+    Rec name expr -> if name == ny then Rec name expr else Rec name (riscrivi expr y v)
+    _ -> error "bad riscrittura"
 
 denote _ = error "not implemented"
 
-main = putStrLn $ show $ denote test'' envy'
+main'' = putStrLn $ show $ denote testrec emptyEnv
+
+main' = putStrLn $ show $ denote test'' envy'
 
 test = (IfThenElse 
  (Mul (Var "x") (Sub (Var "x") (Lit (LInt 4)))) 
@@ -126,3 +155,50 @@ test'' = (LetIn "funzione"
 
 envy = insertEnv "x" (VI 1) (emptyEnv)
 envy' = insertEnv "y" ( VP ((VI 5),(VI 6)) ) (envy)
+
+testrec = 
+ (App
+  (Rec "rec" (Lam "x" (IfThenElse (Var "x") (Lit (LInt 1)) (Mul(Var "x")(App (Var "rec")(Sub (Var "x")(Lit(LInt 1))))) )))
+  (Lit (LInt 10))
+ )
+
+--Dato il nostro programma, forniamo una serie di "punti" appartenenti a Tau da dare come argomento al programma,
+-- osserviamo il comportamento
+appPL :: Expr -> [Tau] -> [Maybe Tau]
+appPL program args = 
+ case (denote program emptyEnv) of
+  Just (VI i) -> take (length args) (repeat (Just (VI i)) )
+  Just (VP p) -> take (length args) (repeat (Just (VP p)) )
+  Just (VF fun) -> map fun args
+  Nothing -> take (length args) (repeat Nothing)
+
+
+fattoriale =
+ (Rec "rec" (Lam "x" (IfThenElse (Var "x") (Lit (LInt 1)) (Mul(Var "x")(App (Var "rec")(Sub (Var "x")(Lit(LInt 1))))) )))
+
+test_fattoriale = 
+ putStrLn $ show $ appPL fattoriale [(VI 4), (VI 5), (VI 6)]
+
+pairFunction =
+ (LetIn "c" 
+  (Lit (LInt 10))
+  (Rec "rec" (Lam "pair" (IfThenElse (First (Var "pair"))
+                                     (Var "pair") 
+                                     (App (Var "rec") (Lit $ LPair (Sub(First (Var "pair"))(Lit(LInt 1))) (Second (Var "pair"))))
+                         )
+             )
+  )
+ )
+
+test_pair = putStrLn $ show $ appPL pairFunction [(VP (VI 1, VI 3))]
+
+t_function =
+ (Lam "f" (App (Var "f") (Lit (LInt 10))))
+
+fa (VI x)= Just (VI 666)
+fb (VI x)= Nothing
+fc (VI x)= Just (VI $ x-1)
+
+test_function = putStrLn $ show $ appPL t_function [(VF fa), (VF fb), (VF fc)]
+
+main = test_function
