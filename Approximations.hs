@@ -7,13 +7,22 @@ data Approximation =
  A [(Approximation,Approximation)]
  deriving (Show, Eq)
 
+--per ora omettiamo le coppie!!
+
 filter2show :: Approximation -> Approximation
 filter2show (N i) = N i
 filter2show (A ax) = A 
- ( map 
-    (\(sx,dx) -> ((filter2show sx) ,(filter2show dx)))
-    (take 5 ax)
+ (filter 
+  (filterBottoms) 
+  ( map 
+     (\(sx,dx) -> ((filter2show sx) ,(filter2show dx)))
+     (take 5 ax)
+  )
  )
+ where
+  filterBottoms :: (Approximation,Approximation) -> Bool
+  filterBottoms ( _ , (A [] ) ) = False
+  filterBottoms  _  = True
 
 
 type Environment = Map.Map Name Approximation
@@ -65,4 +74,40 @@ approx (App t1 t2) = \e -> searchAprx (approx t1 e) (approx t2 e)
   searchAprx (A []) _ = A []
   searchAprx _ (A []) = A []
 
-main = putStrLn $ show $ filter2show $ ( approx (App (Lam "y" (Lam "x" (Sum (Var "x") (Var "y")))) (Lit (LInt 3)))  emptyEnv )
+approx (IfThenElse e1 e2 e3) = \e -> (cond (approx e1 e) e2 e3) e
+ where
+  cond :: Approximation -> Expr -> Expr -> Environment -> Approximation
+  cond (A _) _ _ = \e -> A []
+  cond (N n) th el 
+   | n == 0 = approx th
+   | n /= 0 =  approx el
+   | otherwise = \e -> A []
+
+approx (LetIn name e1 e2) = \e -> ((approx e2) (insertEnv name ((approx e1) e) e))
+
+approx (Rec name (Lam x t)) = \e -> 
+ (approx (Lam x t) (insertEnv name (approx (Rec name (Lam x t)) e) e) )
+
+
+--calcola approssimazioni di un rec!
+muuu :: Expr -> Environment -> [ Approximation ]
+muuu (Rec y (Lam x t)) e = 
+ iterate ff (A [])
+ where
+  ff = \fi -> approx (Lam x t) (insertEnv y fi e) --fi è l'approssimazione precedente
+
+--Anche un metodo per visualizzare le approssimazioni, scartando chi ha nel lato dx un bel bottom.
+
+
+test1 = (App (Lam "y" (Lam "x" (Sum (Var "x") (Var "y")))) (Lit (LInt 3)))
+
+test2 = Lam "x" (IfThenElse (Var "x") (Lit (LInt 666)) (Var "bottom") )
+
+testrec = (App fact (Lit (LInt 10)) )
+
+fact = (Rec "rec" (Lam "x" (IfThenElse (Var "x") (Lit (LInt 1)) (Mul(Var "x")(App (Var "rec")(Sub (Var "x")(Lit(LInt 1))))) )))
+
+testmuu = take 6 ( muuu fact emptyEnv )
+
+--main = putStrLn $ show $ filter2show $ ( approx testrec emptyEnv )
+main = putStrLn $ show $ map filter2show testmuu 
