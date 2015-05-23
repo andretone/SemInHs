@@ -3,7 +3,13 @@
 --semantica denotazionale del REC
 {-# LANGUAGE GADTs #-}
 
-module Denotational where
+module Denotational
+( Tau (..)
+, denote
+, emptyEnv
+, insertEnv
+, appPL
+) where
 
 import Syntax
 
@@ -122,3 +128,12 @@ denote (Rec y (Lam x t)) =
 
 --denote _ = error "not implemented"
 
+--Dato il nostro programma, forniamo una serie di "punti" appartenenti a Tau da dare come argomento al programma,
+-- osserviamo il comportamento
+appPL :: Expr -> [Tau] -> [Maybe Tau]
+appPL program args =
+ case (denote program emptyEnv) of
+  Just (VI i) -> take (length args) (repeat (Just (VI i)) )
+  Just (VP p) -> take (length args) (repeat (Just (VP p)) )
+  Just (VF fun) -> map fun args
+  Nothing -> take (length args) (repeat Nothing)
