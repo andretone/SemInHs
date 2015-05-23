@@ -1,21 +1,25 @@
+--
+--DIFFERISCE da DenotationalGATS solo per diversa implementazione della 
+--semantica denotazionale del REC
+{-# LANGUAGE GADTs #-}
+
 module Denotational where
 
 import Syntax
 
 import qualified Data.Map as Map
-
+import Data.Maybe
 type N = Integer  
 
-type VP tau1 tau2 = (tau1 , tau2) --prodotto Vt1 x Vt2
+data Tau where
+ VI :: N -> Tau 
+ VP :: (Tau , Tau) -> Tau
+ VF :: (Tau -> Maybe Tau) -> Tau
 
-type VF tau1 tau2 = tau1 -> (Maybe tau2) --funzione { Vt1 -> (Vt2)_|_  }
-
-data Tau =  VI N | VP Tau Tau | VF Tau Tau deriving (Show, Eq )
-
---instance Show Tau where
---  show (VI x) = show x
---  show (VF a b) = "<< " ++ show a ++ " -> " ++ show b ++  ">>"
---  show (VP a b) = "(" ++ (show a) ++ " , " ++ (show b) ++ ")"
+instance Show Tau where
+  show (VI x) = show x
+  show (VF a) = "<< Lambda  >>"
+  show (VP (a, b)) = "(" ++ (show a) ++ " , " ++ (show b) ++ ")"
 
 --environment  rho : Var -> Union(Vtau | tau a type) 
 -- Ambiente serve per fornire un valore alle variabili libere
@@ -69,52 +73,52 @@ denote (IfThenElse t0 t1 t2 ) = \e -> cond (denote t0 e) (denote t1 e) (denote t
   cond z0 z1 z2 = case z0 of
    Just (VI 0) -> z1
    Just (VI _) -> z2
+   Nothing -> Nothing
    _ -> error "invalid condition IfThEl"
 
 denote (Lit (LPair t1 t2)) = \e -> liftedPair (denote t1 e) (denote t2 e)
  where
-  liftedPair (Just a) (Just b) = Just (VP a  b)
+  liftedPair (Just a) (Just b) = Just (VP (a , b))
   liftedPair _ Nothing = Nothing
   liftedPair Nothing _ = Nothing
 
 denote (First t) = \e -> liftedProjection1 (denote t e)
  where
-  liftedProjection1 (Just (VP a b)) = Just a
+  liftedProjection1 (Just (VP (a , b))) = Just a
   liftedProjection1 Nothing = Nothing
 
 denote (Second t) = \e -> liftedProjection2 (denote t e)
  where
-  liftedProjection2 (Just (VP a b)) = Just b
+  liftedProjection2 (Just (VP (a, b))) = Just b
   liftedProjection2 Nothing = Nothing
 
 denote (Lam x t) = \e -> 
- Just ( \v -> 
-  VF 
-   v 
-   denote t (modifyEnv v x e) ) --v deve essere un elem di Vt1 e ( \x.t : t1 -> t2)
+ Just ( VF (\v -> denote t (modifyEnv v x e) )) --v deve essere un elem di Vt1 e ( \x.t : t1 -> t2)
 
 denote (App t1 t2) = \e -> 
  let fi = denote t1 e
-     v  = denote t2 e
- in  fi v
+     dv  = denote t2 e
+ in case fi of
+  Just (VF fun) -> 
+   case dv of
+    Just v -> fun v
+    Nothing -> Nothing
+  Nothing -> Nothing
+  _ -> error "bad application"
 
 denote (LetIn x t1 t2) = \e ->
- let v = denote t1 e
- in  (denote t2 (modifyEnv v x e) )
+ let dv = denote t1 e --verificare correttezza di ciò, siamo eager, magari giusto così, 
+--altrimenti con case? forzerebbe l'esecuzione, potrebbe anche starci
+ in
+  case dv of
+   Just v -> (denote t2 (modifyEnv v x e) )
+   Nothing -> Nothing
 
---denote (Rec y (Lam x t)) = \e ->
--- Just 
---  muuu $ fi (\v -> (denote t (modifyEnv v x (modifyEnv fi y e))))
+--sistema più simpatico per definire punto fisso
+denote (Rec y (Lam x t)) = 
+ \e ->
+  Just $ VF
+       ((\f -> \v -> (denote t (modifyEnv f y (modifyEnv v x e)))) (fromJust $ denote (Rec y (Lam x t)) e))
 
-denote _ = error "not implemented"
+--denote _ = error "not implemented"
 
-main = putStrLn $ show $ denote test envy'
-
-test = (IfThenElse 
- (Mul (Var "x") (Sub (Var "x") (Lit (LInt 4)))) 
- (First (Var "y"))
- (Second (Var "y"))
- )
-
-envy = insertEnv "x" (VI 1) (emptyEnv)
-envy' = insertEnv "y" (VP (VI 5)(VI 6)) (envy)

@@ -1,6 +1,10 @@
+--
+-- LAMBDA CALCOLO + EAGER SEMANTICA OPERAZIONALE
+--
+
 --proviamo ad estendere lambda con il linguaggio eager!!!
 --ora estendiamo con il sistema di tipi!!!!
-module Lam where
+module LamUntiped where
 import qualified Data.Map as Map
 
 import Control.Monad.State
@@ -9,39 +13,13 @@ import System.IO
 
 import Debug.Trace
 
---sintassi
-type Name = (String) --vei a pagina 183-184 sui tipi delle variabili, esplicitati nel nome
-
---piazziamoci l'eager
---data Term =     X Var | --variabili x : tau
---                Num N | Sum Term Term | Sub Term Term | Mul Term Term | IfThenElse Term Term Term |
---                Pair Term Term | First Term | Second Term |
---                Function Var Term | Apply Term Term | LetIn Var Term Term |
---                Rec Var Var Term deriving Show
-----
-
-data Expr
-  = Var Name
-  | Lit Lit
-  | App Expr Expr
-  | Lam Name Expr
-  | Sum Expr Expr | Sub Expr Expr | Mul Expr Expr
-  | IfThenElse Expr Expr Expr
-  | First Expr | Second Expr
-  | LetIn Name Expr Expr | Fix Expr | Rec Name Expr --in rec Expr deve essere Lam Name Expr
-  deriving (Eq, Show)
-
-data Lit --literals 
-  = LInt Integer
-  | LBool Bool
-  | LPair Expr Expr
-  deriving (Show, Eq ) --Ord
+import Syntax
 
 --evaluation
 data Value
   = VInt Integer
   | VBool Bool --andrebbe tolto?
-  | VClosure String Expr (Lam.Scope)
+  | VClosure String Expr (LamUntiped.Scope)
   | VPair Value Value
 
 instance Show Value where
@@ -72,7 +50,7 @@ type Eval a = WriterT [Step] (State EvalState) a
 
 type Scope = Map.Map String Value
 
-mostra :: Lam.Scope -> String
+mostra :: LamUntiped.Scope -> String
 mostra scope = show (Map.toList scope)
 
 --sostituisco nel primo termine le occorrenze del terzo con il secondo
@@ -87,11 +65,11 @@ riscrittura body expr var@(Var v) =
    if name == v 
    then Lam name e
    else Lam name (riscrittura e expr var)
-  Lam.Sum e1 e2 -> Lam.Sum (riscrittura e1 expr var) (riscrittura e2 expr var)
+  Syntax.Sum e1 e2 -> Syntax.Sum (riscrittura e1 expr var) (riscrittura e2 expr var)
   Sub e1 e2 -> Sub (riscrittura e1 expr var) (riscrittura e2 expr var)
   Mul e1 e2 -> Mul (riscrittura e1 expr var) (riscrittura e2 expr var)
   IfThenElse e1 e2 e3 -> IfThenElse (riscrittura e1 expr var) (riscrittura e2 expr var) (riscrittura e3 expr var)
-  Lam.First e -> Lam.First (riscrittura e expr var)
+  Syntax.First e -> Syntax.First (riscrittura e expr var)
   Second e -> Second (riscrittura e expr var)
   LetIn n e1 e2 ->
    (LetIn
@@ -114,7 +92,7 @@ riscrittura body expr var@(Var v) =
   
 riscrittura _b _e _notvar = error "riscrittura su un temine non variable, non prevista"
 
-eval :: Lam.Scope -> Expr -> Eval Value
+eval :: LamUntiped.Scope -> Expr -> Eval Value
 eval env expr = case expr of
 
   Lit (LInt x) -> do
@@ -142,7 +120,7 @@ eval env expr = case expr of
     red b
     apply x y
 
-  Lam.Sum t1 t2 -> inc $ do
+  Syntax.Sum t1 t2 -> inc $ do
     VInt x <- eval env t1
     VInt y <- eval env t2 --se tutto va secondo i piani mi torna un intero? VInt
     return $ VInt (x+y)
@@ -179,7 +157,7 @@ eval env expr = case expr of
         eval env t2
      result -> error ("IFTHENELSE: ERRO on" ++ (show $ IfThenElse b t1 t2))
 
-  Lam.First a -> inc $ do
+  Syntax.First a -> inc $ do
     VPair f s <- eval env a --casini se non c'è un pair!!
     return f
 
@@ -211,7 +189,7 @@ v2e (VPair v1 v2) = (Lit (LPair (v2e v1) (v2e v2)))
 v2e (VClosure str exp scope) = (Lam str  (vClosure2expr exp (Map.delete str scope) ))
 v2e _ = error "V2E error"
 
-vClosure2expr :: Expr -> Lam.Scope -> Expr
+vClosure2expr :: Expr -> LamUntiped.Scope -> Expr
 vClosure2expr l@(Lit _) env = l
 vClosure2expr (Lam n expr) env = (Lam n (vClosure2expr expr (Map.delete n env)))
 vClosure2expr (Var name) env =
@@ -219,98 +197,13 @@ vClosure2expr (Var name) env =
                 True -> v2e (env Map.! name)
                 False -> (Var name)
 vClosure2expr (App e1 e2) env = (App (vClosure2expr e1 env) (vClosure2expr e2 env))
-vClosure2expr (Lam.Sum e1 e2) env = (Lam.Sum (vClosure2expr e1 env) (vClosure2expr e2 env))
-vClosure2expr (Lam.Sub e1 e2) env = (Lam.Sub (vClosure2expr e1 env) (vClosure2expr e2 env))
+vClosure2expr (Syntax.Sum e1 e2) env = (Syntax.Sum (vClosure2expr e1 env) (vClosure2expr e2 env))
+vClosure2expr (Syntax.Sub e1 e2) env = (Syntax.Sub (vClosure2expr e1 env) (vClosure2expr e2 env))
 vClosure2expr (Mul e1 e2) env = (Mul (vClosure2expr e1 env) (vClosure2expr e2 env))
 vClosure2expr (IfThenElse e1 e2 e3) env = (IfThenElse (vClosure2expr e1 env) (vClosure2expr e2 env) (vClosure2expr e3 env))
-vClosure2expr (Lam.First e) env = (Lam.First (vClosure2expr e env))
+vClosure2expr (Syntax.First e) env = (Syntax.First (vClosure2expr e env))
 vClosure2expr (Second e) env = (Second (vClosure2expr e env))
 vClosure2expr (LetIn name e1 e2) env = (LetIn name (vClosure2expr e1 env) (vClosure2expr e2 env))--let n=a in b == (\a.b)e
 vClosure2expr (Fix expr) env = (Fix (vClosure2expr expr env))
 vClosure2expr expr scope = expr
 
---TESTS
-main =  do
- putStrLn $ show provaRec
- putStrLn $ show $ fst $ runEval (App (provaRec ) (Lit (LInt 9)))
-
-main' = putStrLn $ show $ v2e $ fst $ runEval anothertest 
-
-
-anothertest =(Lam "q" (App (Lam "a" (Lam "b" (App (Var "b") (Var "a")))) (App (Lam "z" (Lam "c" (Var "c"))) (Lit (LInt 1)) ) ) )
-
-test = (App (Lam "y" (App (Var "s") (Var "y"))) (Lit (LInt 1)) )
-
-controversial = (App (Lam "y" (Lam "x" (App (Var "y") (Var "x")) )) (Var "x")) 
-
-tt = (Lam "x" (Lam "y" (App (Lam "x" (App (Var "x")(App (Var "x")(Var "y")))) (Lam "z" (App (Var "z")(Var "x")))) ))
-
-verytest =
-	(App
-		(Lam
-			"x"
-                        (App
-                          (Lam
-                            "y"
-                            (Lam "x" (App (Var "y") (Var "x" ))) )
-                          (Var "x")
-                        )
-                )
-                (Lam "e" (Lam.Sum (Var "e") (Lit(LInt 1))))
-        )
-
-verydifficult = 
-		(App 
-			(App 
-				(Lam 
-					"x" 
-					(App 
-						(Lam 
-							"y"
-							(Lam "x" (App (Var "y") (Var "x" ))) ) 
-						(Var "x") 
-					)
-				)
-				(Lam "e" (Lam.Sum (Var "e") (Lit(LInt 1))))
-			) 
-			(Lit (LInt 1))
-		)
-
-t0 = ( LetIn
-         "x"
-         (Lam "y" (Var "y"))
-         (App (Var "x") (Lit (LInt 1)))
-     )
-
-t1 =	(Lam.Second (IfThenElse (Sub (Lit (LInt 2)) (App (Lam "x" (Lam.Sum (Lit (LInt 2)) (Var "x") ) ) (Lit (LInt 1)) ))
-		(Lit (LInt 1))
-		(Lit (LPair (Lit (LInt 11)) (Lit (LInt 12)) ))
-	))
-
-t2 = ( LetIn 
-         "x" 
-         (Lam "y" (Lam.Sum (Lit (LInt 2)) (Var "y")))
-         (App (Var "x") (Lit (LInt 1))) 
-     )
-
-t3 = ( LetIn
-         "x"
-         (Lam.Sum (Var "x") (Var "x"))
-         (Var "x")
-     )
-
---VOGLIAMO AGGIUNGERE I LET? REC?
--- LetIn Var Expr Expr
---letIn :: Name -> Expr -> Expr -> Expr
---letIn str exp1 exp2 = (App (Lam str exp2) (exp1))
-
---fix v = v (\x . (fix v) x)
---fixed :: Expr -> Expr
---fixed v = (App v (Lam ("x",RecType) (App (fixed v) (Var ("x",RecType))) ) )
---fixed f = letIn "x" (App f (Var "x")) (Var "x")
-
-fact' = (Lam "rec" (Lam "n" (IfThenElse (Var "n") (Lit (LInt 1)) (Mul (Var "n") (App (Var "rec") (Sub (Var "n") (Lit(LInt 1))))))))
-
-testrec = App (Fix $ fact') (Lit (LInt 10))
-
-provaRec = (Rec "rec" (Lam "x" (IfThenElse (Var "x") (Lit (LInt 1)) (Mul(Var "x")(App (Var "rec")(Sub (Var "x")(Lit(LInt 1))))) )))
