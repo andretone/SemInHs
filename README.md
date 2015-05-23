@@ -6,7 +6,7 @@ semantiche operazionali, denotazionali e calcolo di approssimazini di funzioni.
 esempi di utilizzo:
 
 Semantica OPERAZIONALE:
-> ghci
+>ghci
 Prelude> :l LamUntiped
 [...]
 LamUntiped Syntax> :m + Syntax
@@ -21,7 +21,7 @@ Loading package containers-0.4.2.1 ... linking ... done.
 
 SEMANTICA DENOTAZIONALE:
 caricare moduli
-> ghci
+>ghci
 Prelude> :l Denotational Syntax
 [..]
 Prelude Syntax Denotational> :m + Syntax 
