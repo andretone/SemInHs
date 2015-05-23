@@ -18,13 +18,11 @@ import Syntax
 --evaluation
 data Value
   = VInt Integer
-  | VBool Bool --andrebbe tolto?
   | VClosure String Expr (LamUntiped.Scope)
   | VPair Value Value
 
 instance Show Value where
   show (VInt x) = show x
-  show (VBool x) = show x
   show (VClosure str expr env) = "<<closure " ++ str ++ " " ++ show expr ++ "{" ++ mostra env ++"}" ++ ">>"
   show (VPair a b) = "(" ++ (show a) ++ " , " ++ (show b) ++ ")"
 
@@ -97,9 +95,6 @@ eval env expr = case expr of
 
   Lit (LInt x) -> do
     return $ VInt (fromIntegral x)
-
-  Lit (LBool x) -> do
-    return $ VBool x
 
   Lit (LPair a b) -> do
     x <- (eval env a)

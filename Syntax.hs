@@ -15,6 +15,5 @@ module Syntax where
 
  data Lit --literals 
   = LInt Integer
-  | LBool Bool
   | LPair Expr Expr
   deriving (Show, Eq ) --Ord

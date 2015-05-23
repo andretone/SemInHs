@@ -15,6 +15,7 @@ import Syntax
 
 import qualified Data.Map as Map
 import Data.Maybe
+
 type N = Integer  
 
 data Tau where
