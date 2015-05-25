@@ -60,3 +60,10 @@ APPROSSIMAZIONI:
 attenzione a non generare liste infinite! (usare la funzione take sulle liste per limitare i risultati)
 viene fornita anche filter2show, che tronca le liste ai primi 5 elmti.
 
+..> :l Appproximation.hs
+
+..> :m + Syntax
+
+..>filter2show $ ( approx (Lit (LInt 4)) emptyEnv )
+
+N 4

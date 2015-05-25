@@ -88,3 +88,4 @@ approx (LetIn name e1 e2) = \e -> ((approx e2) (insertEnv name ((approx e1) e) e
 approx (Rec name (Lam x t)) = \e -> 
  (approx (Lam x t) (insertEnv name (approx (Rec name (Lam x t)) e) e) )
 
+approx _ = error "not implemeted yet"
