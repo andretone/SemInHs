@@ -2,10 +2,24 @@ Linguaggio (con lambda calcolo) EAGER di ordine superiore
 
 semantiche operazionali, denotazionali e calcolo di approssimazini di funzioni.
 
+- LamUntiped.hs : troviamo l'interprete che segue la semantica operazionale, è stato inplementato
+anche l'interprete che si occupa del lambda calcolo.
 
-esempi di utilizzo:
+- Denotational.hs : troviamo metodi per calcolare la semantica denotazionale del linguaggio eager.
+Sege le definizioni del libro "The Formal Semantics of Programming Languages", Glynn Winskel.
 
-Semantica OPERAZIONALE:
+- Approximations.hs : offre dei metodi per calcolare delle approssimazioni del linguaggio.
+Le approssimazioni sono rappresentate come liste di coppie. Non sono implementate le coppie come tipo,
+e quindi le relative operazioni first e second, ma solo gli interi.
+
+- Syntax.hs : è definita la sintassi del linguaggio
+
+- Nei moduli Testxxxxxx.hs si trovano degli esempi di programmi e invocazioni dei relativi moduli.
+
+
+- esempi di utilizzo:
+
+--Semantica OPERAZIONALE:
 
 prompt>ghci
 
@@ -29,7 +43,7 @@ Loading package containers-0.4.2.1 ... linking ... done.
 
 (12,[(1,Lam "x" (Sum (Var "x") (Lit (LInt 3)))),(1,Lit (LInt 9)),(2,Var "x")])
 
-SEMANTICA DENOTAZIONALE:
+--SEMANTICA DENOTAZIONALE:
 caricare moduli
 
 prompt>ghci
@@ -56,7 +70,7 @@ Loading package containers-0.4.2.1 ... linking ... done.
 
 Just 1
 
-APPROSSIMAZIONI:
+--APPROSSIMAZIONI:
 attenzione a non generare liste infinite! (usare la funzione take sulle liste per limitare i risultati)
 viene fornita anche filter2show, che tronca le liste ai primi 5 elmti.
 
