@@ -16,11 +16,17 @@ LamUntiped Syntax> :m + Syntax
 [..]
 
 LamUntiped Syntax> runEval (App (Lam "x" (Syntax.Sum (Var "x") (Lit(LInt 3)))  ) (Lit (LInt 9)))
+
 Loading package transformers-0.2.2.0 ... linking ... done.
+
 Loading package mtl-2.0.1.0 ... linking ... done.
+
 Loading package array-0.4.0.0 ... linking ... done.
+
 Loading package deepseq-1.3.0.0 ... linking ... done.
+
 Loading package containers-0.4.2.1 ... linking ... done.
+
 (12,[(1,Lam "x" (Sum (Var "x") (Lit (LInt 3)))),(1,Lit (LInt 9)),(2,Var "x")])
 
 SEMANTICA DENOTAZIONALE:
