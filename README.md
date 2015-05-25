@@ -29,20 +29,26 @@ caricare moduli
 prompt>ghci
 
 Prelude> :l Denotational Syntax
+
 [..]
 
-Prelude Syntax Denotational> :m + Syntax 
+Prelude Syntax Denotational> :m + Syntax
+
 [..]
 
 Prelude Syntax Denotational> (Lit (LInt 3))
+
 Lit (LInt 3)
 
-Prelude Syntax Denotational> denote (Syntax.Lit (Syntax.LInt 1)) emptyEnv 
-Loading package array-0.4.0.0 ... linking ... done.
-Loading package deepseq-1.3.0.0 ... linking ... done.
-Loading package containers-0.4.2.1 ... linking ... done.
-Just 1
+Prelude Syntax Denotational> denote (Syntax.Lit (Syntax.LInt 1)) emptyEnv
 
+Loading package array-0.4.0.0 ... linking ... done.
+
+Loading package deepseq-1.3.0.0 ... linking ... done.
+
+Loading package containers-0.4.2.1 ... linking ... done.
+
+Just 1
 
 APPROSSIMAZIONI:
 attenzione a non generare liste infinite! (usare la funzione take sulle liste per limitare i risultati)
