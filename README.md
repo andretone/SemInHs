@@ -6,11 +6,15 @@ semantiche operazionali, denotazionali e calcolo di approssimazini di funzioni.
 esempi di utilizzo:
 
 Semantica OPERAZIONALE:
+
 prompt>ghci
+
 Prelude> :l LamUntiped
 [...]
+
 LamUntiped Syntax> :m + Syntax
 [..]
+
 LamUntiped Syntax> runEval (App (Lam "x" (Syntax.Sum (Var "x") (Lit(LInt 3)))  ) (Lit (LInt 9)))
 Loading package transformers-0.2.2.0 ... linking ... done.
 Loading package mtl-2.0.1.0 ... linking ... done.
@@ -21,13 +25,18 @@ Loading package containers-0.4.2.1 ... linking ... done.
 
 SEMANTICA DENOTAZIONALE:
 caricare moduli
+
 prompt>ghci
+
 Prelude> :l Denotational Syntax
 [..]
+
 Prelude Syntax Denotational> :m + Syntax 
 [..]
+
 Prelude Syntax Denotational> (Lit (LInt 3))
 Lit (LInt 3)
+
 Prelude Syntax Denotational> denote (Syntax.Lit (Syntax.LInt 1)) emptyEnv 
 Loading package array-0.4.0.0 ... linking ... done.
 Loading package deepseq-1.3.0.0 ... linking ... done.
