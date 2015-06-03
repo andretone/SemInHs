@@ -43,6 +43,11 @@ Loading package containers-0.4.2.1 ... linking ... done.
 
 (12,[(1,Lam "x" (Sum (Var "x") (Lit (LInt 3)))),(1,Lit (LInt 9)),(2,Var "x")])
 
+Per interpretare un programma si utilizza runEval, consultare TestSemOperazionale.hs
+per ulteriori esempi.
+Per visualizzare meglio le closure ottenute dall'esecuzione, applicare v2e
+che adatta i valori ottenuti a termini.
+
 --SEMANTICA DENOTAZIONALE:
 caricare moduli
 
@@ -69,6 +74,9 @@ Loading package deepseq-1.3.0.0 ... linking ... done.
 Loading package containers-0.4.2.1 ... linking ... done.
 
 Just 1
+
+denote permette di calcolare seguendo la semantica denotazionale,
+consultare TestSemDenotazionale.hs per altri esempi.
 
 --APPROSSIMAZIONI:
 attenzione a non generare liste infinite! (usare la funzione take sulle liste per limitare i risultati)
