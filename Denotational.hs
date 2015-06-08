@@ -1,6 +1,5 @@
---
---DIFFERISCE da DenotationalGATS solo per diversa implementazione della 
---semantica denotazionale del REC
+--SEMANTICA DENOTAZIONALE--
+
 {-# LANGUAGE GADTs #-}
 
 module Denotational
@@ -100,7 +99,8 @@ denote (Second t) = \e -> liftedProjection2 (denote t e)
   liftedProjection2 Nothing = Nothing
 
 denote (Lam x t) = \e -> 
- Just ( VF (\v -> denote t (modifyEnv v x e) )) --v deve essere un elem di Vt1 e ( \x.t : t1 -> t2)
+ Just ( VF (\v -> denote t (modifyEnv v x e) )) 
+ --v deve essere un elem di Vt1 e ( \x.t : t1 -> t2)
 
 denote (App t1 t2) = \e -> 
  let fi = denote t1 e
@@ -114,20 +114,19 @@ denote (App t1 t2) = \e ->
   _ -> error "bad application"
 
 denote (LetIn x t1 t2) = \e ->
- let dv = denote t1 e --verificare correttezza di ciò, siamo eager, magari giusto così, 
---altrimenti con case? forzerebbe l'esecuzione, potrebbe anche starci
+ let dv = denote t1 e 
  in
   case dv of
    Just v -> (denote t2 (modifyEnv v x e) )
    Nothing -> Nothing
 
---sistema più simpatico per definire punto fisso
 denote (Rec y (Lam x t)) = 
  \e ->
   Just $ VF
-       ((\f -> \v -> (denote t (modifyEnv f y (modifyEnv v x e)))) (fromJust $ denote (Rec y (Lam x t)) e))
+       ((\f -> \v -> 
+         (denote t (modifyEnv f y (modifyEnv v x e)))) (fromJust $ denote (Rec y (Lam x t)) e))
 
---denote _ = error "not implemented"
+denote _ = error "not implemented"
 
 --Dato il nostro programma, forniamo una serie di "punti" appartenenti a Tau da dare come argomento al programma,
 -- osserviamo il comportamento
