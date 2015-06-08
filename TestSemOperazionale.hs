@@ -1,6 +1,6 @@
 module Main where
 
-import LamUntiped
+import LamUntyped
 import Syntax
 --TESTS
 anothertest =(Lam "q" (App (Lam "a" (Lam "b" (App (Var "b") (Var "a")))) (App (Lam "z" (Lam "c" (Var "c"))) (Lit (LInt 1)) ) ) )

@@ -3,7 +3,7 @@
 --
 
 --proviamo ad estendere lambda con il linguaggio eager!!!
-module LamUntiped where
+module LamUntyped where
 import qualified Data.Map as Map
 
 import Control.Monad.State
@@ -17,7 +17,7 @@ import Syntax
 --evaluation
 data Value
   = VInt Integer
-  | VClosure String Expr (LamUntiped.Scope)
+  | VClosure String Expr (LamUntyped.Scope)
   | VPair Value Value
 
 instance Show Value where
@@ -49,7 +49,7 @@ type Eval a = WriterT [Step] (State EvalState) a
 
 type Scope = Map.Map String Value
 
-mostra :: LamUntiped.Scope -> String
+mostra :: LamUntyped.Scope -> String
 mostra scope = show (Map.toList scope)
 
 --sostituisco nel primo termine le occorrenze del terzo con il secondo
@@ -99,7 +99,7 @@ riscrittura body expr var@(Var v) =
 riscrittura _b _e _notvar = 
  error "riscrittura su un temine non variable, non prevista"
 
-eval :: LamUntiped.Scope -> Expr -> Eval Value
+eval :: LamUntyped.Scope -> Expr -> Eval Value
 eval env expr = case expr of
 
   Lit (LInt x) -> do
@@ -193,7 +193,7 @@ v2e (VPair v1 v2) = (Lit (LPair (v2e v1) (v2e v2)))
 v2e (VClosure str exp scope) = (Lam str  (vClosure2expr exp (Map.delete str scope) ))
 v2e _ = error "V2E error"
 
-vClosure2expr :: Expr -> LamUntiped.Scope -> Expr
+vClosure2expr :: Expr -> LamUntyped.Scope -> Expr
 vClosure2expr l@(Lit _) env = l
 vClosure2expr (Lam n expr) env = 
  (Lam n (vClosure2expr expr (Map.delete n env)))
