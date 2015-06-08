@@ -73,14 +73,15 @@ denote (Mul t1 t2) = \e -> mulLifted (denote t1 e) (denote t2 e)
   mulLifted Nothing (Just(VI _)) = Nothing
   mulLifted _ _ = error "invalid mul"
 
-denote (IfThenElse t0 t1 t2 ) = \e -> cond (denote t0 e) (denote t1 e) (denote t2 e)
- where
-  cond :: Maybe Tau -> Maybe Tau -> Maybe Tau -> Maybe Tau
-  cond z0 z1 z2 = case z0 of
-   Just (VI 0) -> z1
-   Just (VI _) -> z2
-   Nothing -> Nothing
-   _ -> error "invalid condition IfThEl"
+denote (IfThenElse t0 t1 t2 ) = 
+ \e -> cond (denote t0 e) (denote t1 e) (denote t2 e)
+  where
+   cond :: Maybe Tau -> Maybe Tau -> Maybe Tau -> Maybe Tau
+   cond z0 z1 z2 = case z0 of
+    Just (VI 0) -> z1
+    Just (VI _) -> z2
+    Nothing -> Nothing
+    _ -> error "invalid condition IfThEl"
 
 denote (Lit (LPair t1 t2)) = \e -> liftedPair (denote t1 e) (denote t2 e)
  where
@@ -124,11 +125,13 @@ denote (Rec y (Lam x t)) =
  \e ->
   Just $ VF
        ((\f -> \v -> 
-         (denote t (modifyEnv f y (modifyEnv v x e)))) (fromJust $ denote (Rec y (Lam x t)) e))
+         (denote t (modifyEnv f y (modifyEnv v x e)))) 
+	 (fromJust $ denote (Rec y (Lam x t)) e))
 
 denote _ = error "not implemented"
 
---Dato il nostro programma, forniamo una serie di "punti" appartenenti a Tau da dare come argomento al programma,
+--Dato il nostro programma, forniamo una serie di "punti" 
+--appartenenti a Tau da dare come argomento al programma,
 -- osserviamo il comportamento
 appPL :: Expr -> [Tau] -> [Maybe Tau]
 appPL program args =

@@ -10,7 +10,7 @@ module Syntax where
   | Sum Expr Expr | Sub Expr Expr | Mul Expr Expr
   | IfThenElse Expr Expr Expr
   | First Expr | Second Expr
-  | LetIn Name Expr Expr | Fix Expr | Rec Name Expr --in rec Expr deve essere Lam Name Expr
+  | LetIn Name Expr Expr | Fix Expr | Rec Name Expr
   deriving (Eq, Show)
 
  data Lit --literals 

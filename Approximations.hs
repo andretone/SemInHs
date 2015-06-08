@@ -98,4 +98,5 @@ muuu (Rec y (Lam x t)) e =
  where
   ff = \fi -> approx (Lam x t) (insertEnv y fi e) --fi e' l'approssimazione precedente
 muuu _ _ = error "muuu accepts only Rec-terms"
---Anche un metodo per visualizzare le approssimazioni, scartando chi ha nel lato dx un bel bottom.
+--Anche un metodo per visualizzare le approssimazioni, 
+--scartando chi ha nel lato dx un bel bottom.
