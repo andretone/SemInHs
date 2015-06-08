@@ -89,3 +89,13 @@ approx (Rec name (Lam x t)) = \e ->
  (approx (Lam x t) (insertEnv name (approx (Rec name (Lam x t)) e) e) )
 
 approx _ = error "not implemeted yet"
+
+
+--calcola approssimazioni di un rec!
+muuu :: Expr -> Environment -> [ Approximation ]
+muuu (Rec y (Lam x t)) e =
+ iterate ff (A [])
+ where
+  ff = \fi -> approx (Lam x t) (insertEnv y fi e) --fi e' l'approssimazione precedente
+muuu _ _ = error "muuu accepts only Rec-terms"
+--Anche un metodo per visualizzare le approssimazioni, scartando chi ha nel lato dx un bel bottom.
