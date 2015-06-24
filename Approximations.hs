@@ -2,6 +2,13 @@ module Approximations where
 import qualified Data.Map as Map
 import Syntax hiding (LPair)
 
+{-
+Approssimazioni:
+possono essere numeri interi, 
+oppure liste di coppie che descrivono 
+il comportamento di una funzione
+-}
+
 data Approximation = 
  N Integer |
  A [(Approximation,Approximation)]
@@ -9,6 +16,10 @@ data Approximation =
 
 --per ora omettiamo le coppie!!
 
+{-
+Funzione ausiliaria per "tagliare" le liste e visualizzare solo
+una porzione della lista infinita
+-}
 filter2show :: Approximation -> Approximation
 filter2show (N i) = N i
 filter2show (A ax) = A 
@@ -24,7 +35,9 @@ filter2show (A ax) = A
   filterBottoms ( _ , (A [] ) ) = False
   filterBottoms  _  = True
 
-
+{-
+Environment, una Map, (come negli altri moduli)
+-}
 type Environment = Map.Map Name Approximation
 
 emptyEnv :: Environment
@@ -46,7 +59,7 @@ approx :: Expr -> Environment -> Approximation
 approx (Lit (LInt n)) = \e -> N n
 
 approx (Var name) = \e -> if member name e then (e Map.! name) else A []
---TODO gestire il bottom come una lista vuota!! A []
+--il bottom come una lista vuota: A []
 
 approx (Sum e1 e2) = \e -> pluslift (approx e1 e) (approx e2 e)
  where
@@ -63,9 +76,26 @@ approx (Mul e1 e2) = \e -> mullift (approx e1 e) (approx e2 e)
   mullift (N a) (N b) = N (a*b)
   mullift _ _ = A [] --caso in cui non posso fare la mul
 
+{-
+Per una lambda astrazione la sua approssimazione è una lista di coppie,
+come primo elemento di ogni coppia c'è un intero, come secondo l'approssimazione
+della funzione con in input l'intero (primo elemento della coppia), 
+quindi non faccio altro che aggiungere all'environment la variabile x con valore
+il nuovo intero e calcolare l'approssimzione.
+
+La laziness di haskell ci permette di poter costruire queste liste infinite
+e di non dover calcolare il valore per ogni coppia se non strettamente
+necessario.
+-}
 approx (Lam name expr) = \e -> A $ map ((funzioncina)e) [0..]
  where funzioncina = \e -> \n -> ( N n , ((approx expr) (insertEnv name (N n) e)) )
 
+{-
+L'applicazione non fa altro che selezionare il giusto elemento dalla lista
+approssimazione del primo termine, come chiave di ricerca utilizza il primo 
+elemento della coppia di ogni elemento.
+Il risultato è il secondo elemento della coppia selezionata.
+-}
 approx (App t1 t2) = \e -> searchAprx (approx t1 e) (approx t2 e)
  where
   searchAprx :: Approximation -> Approximation -> Approximation
@@ -91,7 +121,17 @@ approx (Rec name (Lam x t)) = \e ->
 approx _ = error "not implemeted yet"
 
 
---calcola approssimazioni di un rec!
+{-
+Calcola approssimazioni di un rec!
+muuu prende in input un termine nella forma:
+Rec ..
+
+restituisce una lista delle sue approssimazioni.
+La prima è bottom, poi itera applicando al termine l'approssimazione
+precedentemente calcolata.
+
+Questa funzione può essere utile per il calcolo dei punti fissi.
+-}
 muuu :: Expr -> Environment -> [ Approximation ]
 muuu (Rec y (Lam x t)) e =
  iterate ff (A [])

@@ -27,6 +27,12 @@ instance Show Value where
   show (VPair a b) = 
 	"(" ++ (show a) ++ " , " ++ (show b) ++ ")"
 
+{-
+EvalState, inc, red, l'utilizzo del monad transformere WriteT, Step
+Eval possono essere ignorati, non sono essenziali per l'implementazione 
+attuale, ma solo per un eventuale controllo e debug.
+-}
+
 data EvalState = EvalState
   { depth :: Int
   } deriving (Show)
@@ -47,13 +53,22 @@ red x = do
 type Step = (Int, Expr)
 type Eval a = WriterT [Step] (State EvalState) a
 
+{-
+Scope è il nostro environment, un dizionario,
+nome variabile -> valore ad essa attribuito
+-}
 type Scope = Map.Map String Value
 
+--funzione ausiliaria per mostrare il contenuto dello scope
 mostra :: LamUntyped.Scope -> String
 mostra scope = show (Map.toList scope)
 
---sostituisco nel primo termine le occorrenze del terzo con il secondo
--- body[ expression / var]
+
+{-
+ riscrittura:
+ sostituisce nel primo termine le occorrenze del terzo con il secondo
+ body[ expression / var]
+-}
 riscrittura :: Expr -> Expr -> Expr -> Expr
 riscrittura body expr var@(Var v) =
  case body of
@@ -94,11 +109,14 @@ riscrittura body expr var@(Var v) =
    if n == v
    then expr
    else Var n
-  e -> error ("riscrittura:ERROR " ++ show e)
   
 riscrittura _b _e _notvar = 
  error "riscrittura su un temine non variable, non prevista"
 
+{-
+eval
+dato lo scope attuale del termine, torna il suo valore
+-}
 eval :: LamUntyped.Scope -> Expr -> Eval Value
 eval env expr = case expr of
 
@@ -169,29 +187,46 @@ eval env expr = case expr of
     VPair f s <- eval env a
     return s
 
---extend inserisce nello scope
+{-
+extend inserisce nello scope
+una variabile con il suo valore
+(se c'è già una variabile con lo stesso nome, 
+la sostituisce
+-}
 extend :: Scope -> String -> Value -> Scope
 extend env v t = Map.insert v t env
 
+{-
+applico ad una funzione (VClosure)
+un valore, e continua la valutazione
+-}
 apply :: Value -> Value -> Eval Value
 apply (VClosure n e clo) ex = do
   eval (extend clo n ex) e
 apply _ _  = error "Tried to apply non-closure"
 
+--Scope vuoto
 emptyScope :: Scope
 emptyScope = Map.empty
 
+{-
+calcola il temine
+(si ignori (EvalState 0), non è importante per la nostra implementazione)
+-}
 runEval :: Expr -> (Value, [Step])
 runEval x = evalState (runWriterT (eval emptyScope x)) (EvalState 0) 
 --FINE EVAL
 
--- poter visualizzare al meglio una closure!
 
+
+{- 
+poter visualizzare al meglio una closure!
+torna a tradurre le VClosure in termini allo scopo di poterle visualizzare
+-}
 v2e :: Value -> Expr
 v2e (VInt n) = (Lit (LInt n))
 v2e (VPair v1 v2) = (Lit (LPair (v2e v1) (v2e v2)))
 v2e (VClosure str exp scope) = (Lam str  (vClosure2expr exp (Map.delete str scope) ))
-v2e _ = error "V2E error"
 
 vClosure2expr :: Expr -> LamUntyped.Scope -> Expr
 vClosure2expr l@(Lit _) env = l
