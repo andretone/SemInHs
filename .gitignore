@@ -5,3 +5,10 @@ l-dev
 *.chs.h
 .virthualenv
 *~
+
+relazione/main-blx.bib
+relazione/main.aux
+*.pdf
+relazione/main.log
+*.gz
+relazione/main.run.xml

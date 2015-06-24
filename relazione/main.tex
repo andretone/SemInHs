@@ -1,0 +1,481 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{stmaryrd}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{graphicx}
+\usepackage[FIGTOPCAP]{subfigure}
+\usepackage{verbatim,fancyvrb}
+ 
+\usepackage{comment}
+
+\usepackage[backend=bibtex]{biblatex}
+\addbibresource{bibliografia.bib}
+
+\newcommand{\rec}[2]{\mathbf{rec}\ #1 . ( #2 )}
+\newcommand{\letin}[2]{\mathbf{let}\ #1\ \mathbf{in}\ #2}
+\newcommand{\ite}[3]{\mathbf{if}\ #1\ \mathbf{then}\ #2\ \mathbf{else}\ #3}
+\newcommand{\fst}[1]{\mathbf{fst} (#1)}
+\newcommand{\snd}[1]{\mathbf{snd} (#1)}
+\newcommand{\lamb}[2]{\lambda #1 . #2}
+
+
+\title{Relazione Laboratorio Avanzato}
+\author{Andre Toneguzzo}
+\date{Giugno 2015}
+
+\begin{document}
+
+
+\maketitle
+
+\section{Introduzione}
+In questo documento vengono presentati dei moduli haskell per il calcolo  con un linguaggio eager di ordine superiore, seguendo la sua semantica operazionale e denotazionale, nonché alcune scelte di implementazione e progettazione degli stessi.
+
+
+Nella sezione~\ref{sec:operational} si descrive l'interprete del linguaggio, implementato seguendo le definizioni della semantica operazionale del linguaggio, con particolare accento sulle difficoltà di implementazione di un interprete del lambda calcolo. Proprio per quest'ultima problematica viene quindi richiamata la nozione della macchina di Landin, un programma che simula una macchina a registri per l'interpretazione del lambda calcolo.
+
+Nella sezione~\ref{sec:denotational} viene illustrato il modulo per calcolare il linguaggio seguendo la semantica denotazionale
+
+La sezione~\ref{sec:approximations} presenta un metodo alternativo per la rappresentazione tramite approssimazioni di funzioni per la semantica denotazionale con liste infinite, il modulo ottenuto tiene conto solo di una porzione del linguaggio.
+
+
+\section{Linguaggio eager di ordine superiore}
+\label{sec:language}
+Nel contesto dei linguaggi funzionali, un linguaggio eager è comunemente chiamato \emph{call by value}. 
+%%
+I termini del linguaggio possono essere costruiti utilizzando numerali, variabili, costrutti condizionali e operazioni aritmetiche, possono portare a valori (numerici, coppie, lambda astrazioni) o divergere.
+
+Riportiamo la sintassi del linguaggio:
+
+\begin{equation*}
+\begin{split}
+t ::=& \ x \ \big| \\
+& \ n \ \big| \ t_{1} + t_{2} \ \big| \ t_{1} - t_{2} \ \big| \ t_{1} \times t_{2} \ \big| \ \ite{t_{0}}{t_{1}}{t_{2}} \ \big| \\
+& (t_{1}, t_{2}) \ \big| \ \fst{t} \ \big| \ \snd{t}\ \big| \\
+& \lamb{x}{t} \ \big| \ (t_{1}\ t_{2}) \ \big| \\
+& \ \letin{x \leftarrow t_{1}}{t_{2}} \ \big| \\
+& \ \ite {y}{(\lambda x . t)} 
+\end{split}
+\end{equation*}
+
+Si può osservare l'utilizzo degli operatori aritmetici, il condizionale \emph{if-then-else} accetta un termine aritmetico e non booleano in input.
+Il costruttore $(t_{1}, t_{2})$ definisce le coppie, $\fst{t}$ e $\snd{t}$ sono le proiezioni.
+Per definire le funzioni, si utilizza il costruttore $\lambda$ e $(t_{1}\ t_{2})$ per l'applicazione di due termini.
+Il costrutto $\letin{x \leftarrow t_{1}}{t_{2}}$ viene utilizzato per forzare la valutazione di un termine $t_1$ prima che il suo valore sia usato in $t_2$.
+
+Per definire la funzione $y$ ricorsiva su $(\lambda x . t)$ si utilizza $\textbf{rec}$.
+Un termine $\rec{y}{\lamb{x}{t}}$ definisce ricorsivamente una funzione $y$ che deve essere uguale a $\lamb{x}{t}$ dove il termine t ovviamente coinvolge la variabile $y$.
+
+È possibile comunque scrivere programmi senza significato (ad esempio la somma di due funzioni, o dare ad una funzione meno argomenti del previsto). Quindi consideriamo solo termini ben formati.
+
+Solo ai termini ben formati viene appellato il proprio tipo $\tau$, con notazione $t: \tau$. Si dice che un termine $t$ è \emph{tipabile} quando $t : \tau $, cioè rispetta le regole del type system.
+
+In questo documento non verrà utilizzata alcuna regola del type system, verranno presi comunque in considerazione solo i termini ben formati.
+
+Per ulteriori informazioni sulle regole del type system si faccia affidamento al capitolo 11 di \cite{Winskel}.%winskel
+
+\paragraph{Rappresentazione della sintassi in haskell}
+Nel modulo \texttt{Syntax.hs} è presente la rappresentazione della sintassi del linguaggio in haskell.
+
+\texttt{Expr} è il datatype rappresentante i termini, sono presenti tutti i costrutti del linguaggio eager.
+
+\begin{verbatim}
+module Syntax where
+
+ type Name = (String) 
+
+ data Expr
+  = Var Name
+  | LInt Integer
+  | LPair Expr Expr
+  | App Expr Expr
+  | Lam Name Expr
+  | Sum Expr Expr | Sub Expr Expr | Mul Expr Expr
+  | IfThenElse Expr Expr Expr
+  | First Expr | Second Expr
+  | LetIn Name Expr Expr | Rec Name Expr
+  deriving (Eq, Show)
+
+\end{verbatim}
+
+Tutti i programmi del linguaggio verranno scritti con questa rappresentazione. Un programma è tipato da Haskell come \texttt{Expr}.
+
+\section{Semantica operazionale del linguaggio}
+\label{sec:operational}
+La semantica del linguaggio risulta piuttosto semplice da comprendere.
+%%È visionabile nel libro a pagina 187
+
+\begin{figure}
+\centering
+\begin{gather*}
+c \rightarrow^{e} c\ \mbox{where}\ c \in C^{e}_{\tau}
+\\
+\frac{
+t_{1} \rightarrow^{e} n_{1} \quad t_{2} \rightarrow^{e} n_{2}
+}{
+(t_{1} \mathbf{op} t_{2}) \rightarrow^{e} n_{1}\ op\ n_{2}
+}
+\mbox{quando}\ \mathbf{op}\ \mbox{è}\ +,-,\times
+\\
+\frac{
+t_{0} \rightarrow^{e} 0 \quad t_{1} \rightarrow^{e} c_{1}
+}{
+\ite{t_0}{t_{1}}{t_{2}\rightarrow^{e}c_{1}}
+}
+\\
+\frac{
+t_{0} \rightarrow^{e} n \quad t_{2} \rightarrow^{e} c_{2}
+}{
+\ite{t_0}{t_{1}}{t_{2}\rightarrow^{e}c_{2}}
+}
+\quad n\not{\equiv} 0
+\\
+\frac{
+t_{1} \rightarrow^{e} c_{1} \quad t_{2} \rightarrow^{e} c_{2}
+}{
+(t_{1},t_{2}) \rightarrow^{e} (c_{1}, c_{2})
+}
+\\
+\frac{
+t \rightarrow^{e} (c_{1},c_{2})
+}{
+\fst{t} \rightarrow^{e} c_{1}
+}
+\\
+\frac{
+t \rightarrow^{e} (c_{1},c_{2})
+}{
+\snd{t} \rightarrow^{e} c_{2}
+}
+\\
+\frac{
+t_{1} \rightarrow^{e} \lamb{x}{t'_{1}} \quad t_{2} \rightarrow^{e} c_{2} \quad t'_{1}[c_{2}/x]\rightarrow^{e} c
+}{
+(t_{1} \ t_{2}) \rightarrow^{e} c
+}
+\\
+\frac{
+t_{1} \rightarrow^{e} c_{1} \quad t_{2}[c_{1}/x] \rightarrow^{e} c_{2}
+}{
+\letin{x \Leftarrow t_{1}}{t_{2}} \rightarrow^{e} c_{2}
+}
+\\
+\rec{y}{\lamb{x}{t}} \rightarrow^{e} \lamb{x}{t[\rec{y}{\lamb{x}{t}}/y]}
+\\
+\end{gather*}
+\caption{Semantica operazionale}
+\label{fig:my_label}
+\end{figure}
+
+
+Nel modulo LamUntiped.hs è stato sviluppato un interprete per calcolare i termini  del linguaggio e valutarli in valori. I valori ottenibili possono essere valori interi, valori coppia o lambda astrazioni che rappresentano delle funzioni che non sono applicate.
+
+La valutazione dei termini non risulta particolarmente difficile, in haskell la semantica risulta immediata, specialmente se ci si affida all'utilizzo del lambda calcolo di haskell.
+
+Nel modulo si è voluto invece implementare anche un meccanismo di calcolo per le espressioni del lambda calcolo, lo spunto per l'implementazione è ottenuto dalla macchina di Landin.
+
+\paragraph{La macchina di Landin (SECD machine)}
+È la prima macchina astratta per ridurre le espressioni del lambda calcolo, inventata da P. J. Ladin. La macchina è basata su 4 \emph{registri} contenenti le informazioni necessarie alla valutazione dell'espressione. Questi registri puntano a delle \emph{linked-list} in memoria.
+
+Inizialmente la SECD machine viene presentata nel 1963 da Landin e successivamente pubblicata nel 64 (~\cite{LandinPJ}) lasciando molte scelte implementative aperte. Più tardi la macchina verrà presentata e implementata più in dettaglio da Peter Henderson (\cite{Henderson}) e successivamente fu sviluppata anche una versione hardware dall'università di Calgari (\cite{DesIsu}).
+
+\begin{itemize}
+\item \textbf{S} è un registro che punta al top di una pila (\textbf{Stack}), le funzioni prenderanno argomenti e torneranno il risultato in questa pila.
+\item \textbf{E} punta ad una lista lista di liste \textbf{Environment}, ogni lista rappresenta un livello dell'ambiente che contiene gli argomenti passati alle funzioni, e anche i valori all'interno dello scope della funzione.
+Gli argomenti della funzione sono nel capo della lista, variabili libere ma legate dalle funzioni "vicine" alla funzione sono negli altri elementi della lista.
+\item \textbf{C}, punta alle istruzioni della macchina (in particolare alla testa della lista chiamata Control o \textbf{Code}), eseguire queste istruzioni permette di cambiare tutti i registri della macchina (incluso Code), l'istruzione in posizione TOP è quella da eseguire, si continua ad eseguire istruzioni fino al raggiungimento di STOP nello stack.
+\item \textbf{D} punta alla testa della lista \textbf{Dump} tiene le copie dei registri, in modo da permettere istruzioni come jump, senza perdere i contesti d'esecuzione precedenti.
+\end{itemize}
+
+\paragraph{Descrizione del funzionamento della SECD machine:}
+Quando la valutazione dell'espressione inizia, l'espressione è caricata come unico elemento di Code. Environment, Stack e Dump sono vuoti.
+Durante la valutazione, il contenuto di Code viene convertito in notazione polacca inversa, con unico operatore \textbf{ap} (per applicazione).
+Ad esempio, l'espressione $F ( G X )$ diventa $X:G:ap:F:ap$.
+La valutazione avviene similmente alle altre espressioni in notazione polacca inversa.
+Se il primo elemento in Code è un valore, questo viene messo in Stack. Se l'oggetto era un identificatore, l'oggetto messo nello stack è legato all'identificatore nell'ambiente corrente in Environment. Se l'elemento era una astrazione, è costruita una chiusura per preservare i bindings delle sue variabili libere (che sono in Environment), e la chiusura viene messa nello stack.
+Se l'elemento è una $ap$, due valori sono estratti da Stack, e la applicazione viene effettuata (primo applicato al secondo). Se il risultato della applicazione è un valore, viene messo in Stack.
+Se l'applicazione è di una astrazione su un valore, il risultato nel lambda calcolo può essere comunque una applicazione (invece che un valore), quindi non può essere buttato in Stack, in questo caso il contenuto di Stack, Environment e Code viene salvato in Dump (che è uno stack che accetta triple), Stack viene svuotato, Code è reinizializzato al risultato dell'applicazione, con Environment contenente l'ambiente con le variabili libere dell'espressione, aumentato con i binding al risultato della applicazione.
+La valutazione continua in questo modo, se Code e Dump restano vuoti, la valutazione è completata e il risultato è in Stack.
+
+\paragraph{Implementazione del modulo haskell}
+Nel modulo haskell viene implementato un interprete per il linguaggio, segue le regole della semantica operazionale, e per i termini riguardanti il lambda calcolo vengono valutati ispirandosi in parte alla macchina di Landin.
+
+In particolare ogni qual volta ci si trova a ridurre un valore lambda astrazione esso verrà rappresentato come una chiusura la quale comprende oltre al termine tutti i binding al suo ambiente. Questa operazione ricorda in parte l'utilizzo del registro D nella SECD machine per salvare un intero termine con tutto il suo Environment.
+
+La funzione \texttt{eval} prende in input un termine e torna un valore.
+\begin{verbatim}
+eval :: Eval.Scope -> Expr -> Eval Value
+\end{verbatim}
+
+I valori possono essere di tipo numerico, coppie e \texttt{VClosure} che non sono altro che funzioni con allegato il proprio scope. Le chiusure sono un'ottima soluzione per mantenere i binding corretti sulle variabili, un'altra possibile soluzione implementativa intrapresa nei primi stadi di sviluppo era quella di rinominare le variabili con identificativi assoluti, ma oltre ad essere una soluzione scomoda, non risolve completamente i problemi di scope che si incontrano nel caso del calcolo di funzioni ricorsive, dove runtime i termini si espandono.
+
+\begin{verbatim}
+data Value
+  = VInt Integer
+  | VClosure String Expr (LamUntiped.Scope)
+  | VPair Value Value
+\end{verbatim}
+
+Lo scope è una \texttt{Map} che associa stringhe a valori, può essere visto come un dizionario, dato il nome di una variabile, associa al corretto valore visto dal termine.
+
+\begin{verbatim}
+type Scope = Map.Map String Value
+\end{verbatim}
+
+La valutazione di una lambda-astrazione è appunto una chiusura, comprende il termine con il suo ambiente.
+
+\begin{verbatim}
+eval env expr = case expr of
+[..]
+Lam name body -> inc $ do
+    return (VClosure name body env)
+[..]
+\end{verbatim}
+
+Importante la funzione \texttt{apply} la quale esegue l'applicazione tra due valori. L'applicazione avviene tramite la valutazione del primo termine inserendo nello scope il secondo termine.
+
+\begin{verbatim}
+eval env expr = case expr of
+[..]
+App a b -> inc $ do
+    x <- eval env a
+    red a
+    y <- eval env b
+    red b
+    apply x y
+[..]
+\end{verbatim}
+
+Nel caso si voglia visualizzare la VClosure ottenuta dalla valutazione come un termine del linguaggio è stata implementata la funzione \texttt{v2e}.
+
+
+
+\section{Semantica denotazionale}
+\label{sec:denotational}
+La semantica denotazionale del linguaggio è definita tramite induzione strutturale sui termini.
+
+La semantica denotazionale lavora su i CPO, segue qui sotto la definizione dei CPO per il nostro linguaggio che corrispondono ai domini dei tipi:
+
+\begin{gather*}
+V^{e}_{\mathbf{int}} = N
+\\
+V^{e}_{\tau_{1} * \tau_{2}} = V^{e}_{\tau_{1}} \times V^{e}_{\tau_{2}}
+\\
+V^{e}_{\tau_{1} \rightarrow \tau_{2}} = [V^{e}_{\tau_{1}} \rightarrow (V^{e}_{\tau_{2})_{\perp}}]
+\\
+\end{gather*}
+
+In generale i termini contengono variabili libere, la semantica denotazionale richiede la nozione di ambiente:
+$$
+\rho : \mathbf{Var} \rightarrow \cup \{ V^{e}_\tau \| \tau \ a \ type \}
+$$
+Il quale rispetta i tipi:
+$$
+x : \tau \Rightarrow \rho ( x ) \in V^{e}_{\tau}
+$$
+Le regole della semantica denotazionale sono riportate infine nella figura~\ref{fig:sem-den}.
+
+\begin{figure}[!t]
+    \centering
+    \begin{gather*}
+        \llbracket x \rrbracket^{e} =  \lambda\rho.\lfloor\rho (x) \rfloor 
+        \\ \llbracket n \rrbracket^{e} =  \lambda\rho.\lfloor n \rfloor
+        \\ \llbracket t_{1} \mathbf{op} t_{2} \rrbracket^{e} 
+            =  \lambda\rho.(\llbracket t_{1} \rrbracket^{e}\rho
+            op_{\perp} \llbracket t_{2} \rrbracket^{e}\rho) \ where\ op\ is\ +,-,\times
+        \\ \llbracket \ite{t_{0}}{t_{1}}{t_{2}} \rrbracket^{e} = 
+            \lambda\rho.Cond(\llbracket t_{1} \rrbracket^{e}\rho, 
+                                \llbracket t_{2} \rrbracket^{e}\rho,
+                                \llbracket t_{2} \rrbracket^{e}\rho)
+        \\ \llbracket (t_{1},t_{2})\rrbracket^{e} =  
+            \lambda\rho. let\ v_{1} \Leftarrow \llbracket t_{1} \rrbracket^{e}\rho,
+                v_{2} \Leftarrow \llbracket t_{2} \rrbracket^{e}\rho.
+                \lfloor (v_{1}, v_{2})\rfloor
+        \\ \llbracket \fst{t} \rrbracket^{e} =  \lambda\rho. let\ v \rrbracket^{e}\rho.\lfloor\phi_{1}(v)\rfloor
+        \\ \llbracket \snd{t} \rrbracket^{e} =  \lambda\rho. let\ v \rrbracket^{e}\rho.\lfloor\phi_{2}(v)\rfloor
+        \\ \llbracket \lamb{x}{t} \rrbracket^{e} =  \lambda\rho.\lfloor\lambda v \in V^{e}_{\tau_{1}}.\llbracket t \rrbracket^{e}\rho [ v / x ] \rfloor \ where\ \lambda x.t : \tau_{1} \rightarrow \tau_{2}
+        \\ \llbracket ( t_{1}\ t_{2} ) \rrbracket^{e} = 
+            \lambda\rho. let\ \psi \Leftarrow \llbracket t_{1} \rrbracket^{e}\rho,
+                v \Leftarrow \llbracket t_{2} \rrbracket^{e}\rho. \Phi(v)
+    \\ \llbracket \letin{x \Rightarrow t_{1}}{t_{2}}\rrbracket^{e} =
+        \lambda \rho . let v \Rightarrow \llbracket t_{1} \rrbracket^{e}\rho .
+        \llbracket t_{2} \rrbracket^{e}\rho[v/x]
+    \\ \llbracket \rec{y}{\lambda x.t} \rrbracket^{e} =
+        \lambda\rho\lfloor \mu \psi . (\lambda v.\llbracket t \rrbracket^{e} \rho[v/x,\psi/y]) \rfloor
+    \\
+    \end{gather*}
+    \caption{Definizione semantica denotazionale}
+    \label{fig:sem-den}
+\end{figure}
+
+Si noti inoltre la definizione della funzione \emph{Cond}:
+$$
+Cond\ :\ N_{\perp} \times D \times D \rightarrow D
+$$
+
+\begin{equation*}
+\left.
+Cond (z_{0},z_{1},z_{2}) =
+\right.\Bigg\{
+\begin{aligned}
+z_{1} \quad & if \quad z_{0} = \lfloor 0 \rfloor,
+\\
+z_{2} \quad & if \quad z_{0} = \lfloor n \rfloor \ per \ qualche\ n\in N \ con\ n \neq 0,
+\\
+\perp \quad & altrimenti 
+\end{aligned}
+\end{equation*}
+
+la funzione Cond risulta essere continua.
+
+\paragraph{Implementazione}
+Nel modulo \emph{Denotational.hs} è riportata l'implementazione della semantica denotazionale.
+
+Per rappresentare l'elemento bottom viene fatto uso della monade Maybe durante il calcolo della semantica, l'elemento \texttt{Nothing} indica bottom, in questo modo è direttamente rappresentato, le operazioni di lifting seguono il binding della monade Maybe di haskell.
+
+La funzione \texttt{denote} calcola la semantica denotazionale dato il termine e l'ambiente. Per poter testare una semantica denotazionale, di una funzione, su una lista di valori, che possono anche divergere, viene fornita la funzione \texttt{appPL}, essa prende un termine e una lista di elementi in \texttt{Tau}. Gli elementi in \texttt{Tau} sono i valori e possono rappresentare Interi, coppie e funzioni parziali.
+Grazie a \texttt{appPL} si è in grado di poter testare un termine solo in alcuni punti ed eventualmente osservare come si comporta se diamo in pasto delle funzioni parziali che possono tornare bottom in alcuni punti.
+
+%sarebbe bello qualcosa di più sul bottom = Nothing
+
+\section{Calcolo di approssimazioni tramite liste}
+\label{sec:approximations}
+In questa parte di implementazione si prende una parte ristretta del linguaggio eager dove viene tolta la possibilità di costruire le coppie.
+
+L'intenzione è quella di poter rappresentare le funzioni e funzioni parziali come liste di coppie. Le coppie indicano con il primo elemento l'argomento preso dalla funzione, e con il secondo il valore della funzione in quel punto. Una lista vuota rappresenta l'elemento bottom.
+
+Segue la definizione del datatype in haskell per rappresentare le approssimazioni come lista di coppie.
+
+\begin{verbatim}
+data Approximation = 
+ N Integer |
+ A [(Approximation,Approximation)]
+\end{verbatim}
+
+Ovviamente le approssimazioni possono avere una struttura innestata per rappresentare funzioni che prendono più argomenti o funzioni che prendono funzioni come input.
+
+Si sfrutta quindi la \emph{valutazione lazy} di haskell per ottenere la rappresentazione tramite liste infinite.
+Per evitare una esecuzione infinita durante la stampa a schermo di una approssimazione è stata implementata la funzione \texttt{filter2show :: Approximation -> Approximation} che filtra solo i primi 5 elementi della lista-approssimazione in modo da poter avere un'idea generale dell'approssimazione calcolata.
+
+Anche in questo caso per la gestione delle variabili libere si utilizza un ambiente del tipo \texttt{type Environment = Map.Map Name Approximation}.
+
+Nel sorgente \texttt{Approximations.hs} la funzione \texttt{approx :: Expr -> Environment -> Approximation} viene implementata seguendo l'idea della costruzione di una approssimazione, in particolare si esamini i seguenti due casi:
+
+\begin{verbatim}
+approx (Lam name expr) = 
+ \e -> A $ map ((funzioncina)e) [0..]
+ where funzioncina = 
+  \e -> \n -> ( N n , ((approx expr) (insertEnv name (N n) e)) )
+\end{verbatim}
+
+Dove per calcolare l'approssimazione di una lambda-astrazione si applicherà la funzione su tutti gli elementi del dominio degli interi, questo calcolo su tutto il dominio viene però fatto in modo lazy, col la filosofia della creazione delle liste infinite.
+
+\begin{verbatim}
+approx (App t1 t2) = \e -> searchAprx (approx t1 e) (approx t2 e)
+ where
+  searchAprx :: Approximation -> Approximation -> Approximation
+  searchAprx (A ((a, y):ax)) x =
+   if a == x then y else searchAprx (A ax) x
+  searchAprx (A []) _ = A []
+  searchAprx _ (A []) = A []
+\end{verbatim}
+
+Per calcolare l'approssimazione di una applicazione, si fa una sorta di ricerca sui primi elementi della prima approssimazione, in questo modo si seleziona l'output della funzione rappresentata dalla prima approssimazione.
+
+È evidente che non si possano fare miracoli nel caso si voglia stabilire se una funzione diverge o converge su tutti i valori, almeno non su domini infiniti come lo è già il dominio degli interi, in quanto il \emph{problema dell'arresto} resta indecidibile.
+
+Viene fornita inoltre la funzione \texttt{muuu :: Expr -> Environment -> [ Approximation ]} (si chiuda un occhio per il nome poco significativo) che permette di calcolare le approssimazioni di un termine ricorsivo.
+
+\begin{verbatim}
+muuu :: Expr -> Environment -> [ Approximation ]
+muuu (Rec y (Lam x t)) e =
+ iterate ff (A [])
+ where
+  ff = \fi -> approx (Lam x t) (insertEnv y fi e) 
+  --fi e' l'approssimazione precedente
+muuu _ _ = error "muuu accepts only Rec-terms"
+\end{verbatim}
+
+\texttt{muuu} torna una lista infinita di approssimazioni del termine \texttt{Rec \_ }. Esattamente come si calcola il punto fisso della funzione, \texttt{muuu} parte con la prima approssimazione della funzione $\perp$ rappresentato come una lista vuota, e itera il calcolo.
+
+\begin{verbatim}
+muuu :: Expr -> Environment -> [ Approximation ]
+muuu (Rec y (Lam x t)) e =
+ iterate ff (A [])
+ where
+  ff = \fi -> approx (Lam x t) (insertEnv y fi e) 
+muuu _ _ = error "muuu accepts only Rec-terms"
+\end{verbatim}
+
+Ad esempio sia \texttt{fact} una funzione che calcola il fattoriale, 
+
+\begin{verbatim}
+fact = (Rec "rec" (Lam "x" (ite 
+                                (Var "x") 
+                                (LInt 1)
+                                (Mul(Var "x")
+                                    (App (Var "rec")
+                                    (Sub (Var "x")(LInt 1)))) )))
+\end{verbatim}
+
+Si esegua \texttt{muuu fact emptyEnv }:
+come prima approssimazione viene calcolata 
+\begin{verbatim}
+approx (Lam x (IfThenElse ...) ) (insertEnv "rec" A[] emptyEnv)
+\end{verbatim}
+la prima approssimazione riduce a \texttt{A [(N 0,N 1)]} poiché il fattoriale di 0 è calcolaile senza l'ausilio di chiamate ricorsive.
+Ora iterate calcolerà
+\begin{verbatim}
+approx (Lam x (IfThenElse ...) ) (insertEnv "rec" A [(N 0,N 1)] emptyEnv)
+\end{verbatim}
+E si otterrà la seconda approssimazione \texttt{A [(N 0,N 1),(N 1,N 1)]}.
+Le iterazioni continuano seguendo questo ragionamento, creando una lista infinita:
+
+\begin{verbatim}
+[A [],
+A [(N 0,N 1)],
+A [(N 0,N 1),(N 1,N 1)],A [(N 0,N 1),(N 1,N 1),(N 2,N 2)],
+A [(N 0,N 1),(N 1,N 1),(N 2,N 2),(N 3,N 6)],
+A [(N 0,N 1),(N 1,N 1),(N 2,N 2),(N 3,N 6),(N 4,N 24)]...]
+\end{verbatim}
+
+Grazie alla funzione \texttt{muuu} è tecnicamente possibile trovare il punto fisso, quando due approssimazioni consecutive nella lista sono uguali.
+
+\section{Conclusioni e osservazioni}
+
+I moduli riguardanti la semantica operazionale e denotazionale fanno ciò che ci si aspetta facciano: seguono esattamente la semantica del linguaggio.
+
+Le uniche problematiche sono state la implementazione nel caso della semantica operazionale di un opportuno lambda calcolo, che comunque resta abbastanza indipendente e separato dalle altre regole della semantica operazionale. Con meno sforzi sarebbe stato possibile utilizzare il lambda-calcolo di haskell ottenendo gli stessi risultati.
+
+Nel caso denotazionale, c'è una diretta corrispondenza tra le regole e l'implementazione.
+Grazie alla funzione \texttt{appPL} è possibile testare una denotazione di un programma con altri valori, che non necessariamente devono essere funzioni definite ovunque, ma possono tornare anche valore $\perp$.
+
+Per quanto riguarda la rappresentazione di approssimazioni come liste di coppie tutto funziona in un contesto limitato a funzioni semplici e non di ordine superiore, inoltre tramite la funzione \texttt{muuu} è possibile calcolare le approssimazioni di una ricorsione, da qui è possibile valutare il punto fisso se esiste.
+
+
+\subsection{Possibili sviluppi}
+Nel caso denotazionale e delle approssimazioni si sperava nella possibilità di ottenere qualche risultato nel riconoscimento di programmi che divergono, tuttavia, causa la natura del problema dell'arresto e che i nostri domini del linguaggio sono infiniti non è affatto facile rilevare loop e divergenze.
+
+Possibili sviluppi potrebbero essere fatti sul calcolo delle approssimazioni, che per ora restano ad uno stato molto prototipale. Come prima cosa si potrebbe aggiornare le approssimazioni con la costruzione di coppie di valore, senza troppa fatica, inoltre aggiungere l'ordine superiore, ma in questo caso potrebbero insorgere nuove numerose problematiche: si pensi che le coppie nelle liste-approssimazioni potrebbero avere come primo elemento di ogni coppia delle liste infinite a loro volta, rappresentanti una funzione presa in input come argomento. A questo punto sarebbe necessario poter enumerare tutte le funzioni possibili, inoltre al momento dell'applicazione sarebbe opportuno scegliere la corretta lista infinita sul primo elemento delle coppie e selezionare il secondo elemento. A quel punto è necessaria una gestione delle liste infinite.
+
+
+%\appendix
+
+%\section{sorgenti Haskell}
+
+%\verbatiminput{Syntax.hs}
+
+%\verbatiminput{LamUntyped.hs}
+
+%\verbatiminput{Denotational.hs}
+
+%\verbatiminput{Approximations.hs}
+
+
+\printbibliography
+
+\end{document}
