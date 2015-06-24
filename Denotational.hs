@@ -17,6 +17,13 @@ import Data.Maybe
 
 type N = Integer  
 
+{-
+un termine t denota un elemento di  Maybe(Tau)
+Tau rappresenta il datatype dei CPO
+
+il datatype utilizza i tipi generalizzati algebrici
+di haskell (GADTs, vedi pragma iniziale)
+-}
 data Tau where
  VI :: N -> Tau 
  VP :: (Tau , Tau) -> Tau
@@ -27,10 +34,13 @@ instance Show Tau where
   show (VF a) = "<< Lambda  >>"
   show (VP (a, b)) = "(" ++ (show a) ++ " , " ++ (show b) ++ ")"
 
---environment  rho : Var -> Union(Vtau | tau a type) 
--- Ambiente serve per fornire un valore alle variabili libere
+{-
+environment  rho : Var -> Union(Vtau | tau a type) 
+Ambiente serve per fornire un valore alle variabili libere
+
+Map funziona come un dizionario
+-}
 type Environment = Map.Map Name Tau
--- rispetterà x : tau => tho(x) in Vtau
 
 emptyEnv :: Environment
 emptyEnv = Map.empty
@@ -41,12 +51,22 @@ insertEnv = Map.insert
 member :: Name -> Environment -> Bool
 member = Map.member 
 
-modifyEnv :: Tau -> Name -> Environment -> Environment
 -- modifyEnv v x rho = rho[v/x]
+modifyEnv :: Tau -> Name -> Environment -> Environment
 modifyEnv v x rho = Map.insert x v rho
 
-denote :: Expr -> Environment -> Maybe Tau
+{-
+Dato un termine torna la sua semantica denotazionale
+Nothing indica l'elemento bottom
 
+denote è definita seguendo le regole della semantica 
+denotazionale del libro di Winskel
+-}
+
+denotationalSemOf ::Expr -> Maybe Tau
+denotationalSemOf t = denote t emptyEnv
+
+denote :: Expr -> Environment -> Maybe Tau
 denote (Var x) = 
  \e -> if member x e then Just (e Map.! x) else Nothing
 
@@ -130,9 +150,64 @@ denote (Rec y (Lam x t)) =
 
 denote _ = error "not implemented"
 
---Dato il nostro programma, forniamo una serie di "punti" 
---appartenenti a Tau da dare come argomento al programma,
--- osserviamo il comportamento
+{-
+Dato il nostro programma, forniamo una serie di "punti" 
+appartenenti a Tau da dare come argomento al programma,
+osserviamo il comportamento
+
+appPL prende 
+un termine del linguaggio (programma su cui si vuole testare il comportamento)
+una lista di Tau,
+
+torna:
+Una lista di risultati dell'applicazione dei valori della lista
+su il nostro programma.
+
+Ovviamente se la semantica denotazionale del programma
+è nell'insieme dei numeri interi o delle coppie non ha
+senso fare l'applicazione (caso Just (VI i) e Just (VP p))
+
+ES:
+Prelude Syntax> :l Denotational
+[2 of 2] Compiling Denotational     ( Denotational.hs, interpreted )
+Ok, modules loaded: Denotational, Syntax.
+*Denotational> :m + Syntax 
+*Denotational Syntax> let prog = (Lam "x" (Sum (Lit (LInt 4)) (Var "x")))
+*Denotational Syntax> denote prog emptyEnv 
+Just << Lambda  >>
+*Denotational Syntax> appPL prog [VI 3, VI 4, VI 5]
+[Just 7,Just 8,Just 9]
+
+ES:
+*Denotational Syntax> let prog = (Lam "x" (App (Var "x") (Lit(LInt 5))))
+*Denotational Syntax> appPL prog [(VF $ \a -> Just $ VI (1) ), (VF $ \a -> Nothing)]
+[Just 1,Nothing]
+
+ES:
+> appPL fattoriale [VI 1, VI 2, VI 3]
+[Just 1,Just 2,Just 6]
+
+
+ES. stravagante (presente anche in TestSemDenotazionale.hs):
+programma = (Lam "fun" (App (Var "fun") (Lit(LInt 5))) )
+funA = VF (\y -> case y of
+               VI n -> Just $ VI (n + 3)
+               VP _ -> error "VP"
+               VF _ -> error "VF"
+       )
+funB = VF (\y -> case y of
+               VI n -> Just $ VP (( VI $ n + 3), (VI 4))
+               VP _ -> error "VP"
+               VF _ -> error "VF"
+       )
+tapp = appPL programma [funA , funB]
+> tapp 
+[Just 8,Just (8 , 4)]
+
+come si può vedere le funzioni in Tau descritte da noi possono tranquillamente
+fare cose arbitrarie, basta che restino in Tau
+
+-}
 appPL :: Expr -> [Tau] -> [Maybe Tau]
 appPL program args =
  case (denote program emptyEnv) of

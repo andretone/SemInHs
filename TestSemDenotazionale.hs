@@ -57,4 +57,24 @@ fc (VI x)= Just (VI $ x-1)
 
 test_function = putStrLn $ show $ appPL t_function [(VF fa), (VF fb), (VF fc)]
 
+
+--test per appPL
+programma = (Lam "fun" (App (Var "fun") (Lit(LInt 5))) )
+--parametri tau da fornire ad appPL
+funA = VF (\y -> case y of
+               VI n -> Just $ VI (n + 3)
+               VP _ -> error "VP"
+               VF _ -> error "VF"
+       )
+funB = VF (\y -> case y of
+               VI n -> Just $ VP (( VI $ n + 3), (VI 4))
+               VP _ -> error "VP"
+               VF _ -> error "VF"
+       )
+
+
+tapp = appPL programma [funA , funB]
+
+tapp' = appPL fattoriale [VI 1, VI 2, VI 3]
+
 main = main''
