@@ -72,9 +72,9 @@ mostra scope = show (Map.toList scope)
 riscrittura :: Expr -> Expr -> Expr -> Expr
 riscrittura body expr var@(Var v) =
  case body of
-  Lit (LInt int) -> Lit (LInt int)
-  Lit (LPair lx rx) -> 
-   Lit (LPair (riscrittura lx expr var) (riscrittura rx expr var))
+  (LInt int) -> (LInt int)
+  (LPair lx rx) -> 
+   (LPair (riscrittura lx expr var) (riscrittura rx expr var))
   App e1 e2 -> 
    App (riscrittura e1 expr var) (riscrittura e2 expr var)
   Lam name e ->
@@ -120,10 +120,10 @@ dato lo scope attuale del termine, torna il suo valore
 eval :: LamUntyped.Scope -> Expr -> Eval Value
 eval env expr = case expr of
 
-  Lit (LInt x) -> do
+  (LInt x) -> do
     return $ VInt (fromIntegral x)
 
-  Lit (LPair a b) -> do
+  (LPair a b) -> do
     x <- (eval env a)
     y <- (eval env b)
     return $ VPair x y
@@ -224,12 +224,13 @@ poter visualizzare al meglio una closure!
 torna a tradurre le VClosure in termini allo scopo di poterle visualizzare
 -}
 v2e :: Value -> Expr
-v2e (VInt n) = (Lit (LInt n))
-v2e (VPair v1 v2) = (Lit (LPair (v2e v1) (v2e v2)))
+v2e (VInt n) = (LInt n)
+v2e (VPair v1 v2) = (LPair (v2e v1) (v2e v2))
 v2e (VClosure str exp scope) = (Lam str  (vClosure2expr exp (Map.delete str scope) ))
 
 vClosure2expr :: Expr -> LamUntyped.Scope -> Expr
-vClosure2expr l@(Lit _) env = l
+vClosure2expr l@(LInt _) env = l
+vClosure2expr l@(LPair _ _) env = l
 vClosure2expr (Lam n expr) env = 
  (Lam n (vClosure2expr expr (Map.delete n env)))
 vClosure2expr (Var name) env =

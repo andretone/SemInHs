@@ -4,7 +4,8 @@ module Syntax where
 
  data Expr
   = Var Name
-  | Lit Lit
+  | LInt Integer
+  | LPair Expr Expr
   | App Expr Expr
   | Lam Name Expr
   | Sum Expr Expr | Sub Expr Expr | Mul Expr Expr
@@ -12,8 +13,3 @@ module Syntax where
   | First Expr | Second Expr
   | LetIn Name Expr Expr | Fix Expr | Rec Name Expr
   deriving (Eq, Show)
-
- data Lit --literals 
-  = LInt Integer
-  | LPair Expr Expr
-  deriving (Show, Eq ) --Ord

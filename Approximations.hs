@@ -56,7 +56,7 @@ modifyEnv v x rho = Map.insert x v rho
 --proviamo a rappresentare alcune funzioni
 
 approx :: Expr -> Environment -> Approximation
-approx (Lit (LInt n)) = \e -> N n
+approx (LInt n) = \e -> N n
 
 approx (Var name) = \e -> if member name e then (e Map.! name) else A []
 --il bottom come una lista vuota: A []

@@ -70,7 +70,7 @@ denote :: Expr -> Environment -> Maybe Tau
 denote (Var x) = 
  \e -> if member x e then Just (e Map.! x) else Nothing
 
-denote (Lit (LInt n)) = \e -> Just (VI n)
+denote (LInt n) = \e -> Just (VI n)
 
 denote (Sum t1 t2) = \e -> sumLifted (denote t1 e) (denote t2 e)
  where
@@ -103,7 +103,7 @@ denote (IfThenElse t0 t1 t2 ) =
     Nothing -> Nothing
     _ -> error "invalid condition IfThEl"
 
-denote (Lit (LPair t1 t2)) = \e -> liftedPair (denote t1 e) (denote t2 e)
+denote (LPair t1 t2) = \e -> liftedPair (denote t1 e) (denote t2 e)
  where
   liftedPair (Just a) (Just b) = Just (VP (a , b))
   liftedPair _ Nothing = Nothing
@@ -172,14 +172,14 @@ Prelude Syntax> :l Denotational
 [2 of 2] Compiling Denotational     ( Denotational.hs, interpreted )
 Ok, modules loaded: Denotational, Syntax.
 *Denotational> :m + Syntax 
-*Denotational Syntax> let prog = (Lam "x" (Sum (Lit (LInt 4)) (Var "x")))
+*Denotational Syntax> let prog = (Lam "x" (Sum (LInt 4) (Var "x")))
 *Denotational Syntax> denote prog emptyEnv 
 Just << Lambda  >>
 *Denotational Syntax> appPL prog [VI 3, VI 4, VI 5]
 [Just 7,Just 8,Just 9]
 
 ES:
-*Denotational Syntax> let prog = (Lam "x" (App (Var "x") (Lit(LInt 5))))
+*Denotational Syntax> let prog = (Lam "x" (App (Var "x") (LInt 5)))
 *Denotational Syntax> appPL prog [(VF $ \a -> Just $ VI (1) ), (VF $ \a -> Nothing)]
 [Just 1,Nothing]
 
@@ -189,7 +189,7 @@ ES:
 
 
 ES. stravagante (presente anche in TestSemDenotazionale.hs):
-programma = (Lam "fun" (App (Var "fun") (Lit(LInt 5))) )
+programma = (Lam "fun" (App (Var "fun") (LInt 5)) )
 funA = VF (\y -> case y of
                VI n -> Just $ VI (n + 3)
                VP _ -> error "VP"

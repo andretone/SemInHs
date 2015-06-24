@@ -8,16 +8,16 @@ main'' = putStrLn $ show $ denote testrec emptyEnv
 main' = putStrLn $ show $ denote test'' envy'
 
 test = (IfThenElse
- (Mul (Var "x") (Sub (Var "x") (Lit (LInt 4))))
+ (Mul (Var "x") (Sub (Var "x") (LInt 4)))
  (First (Var "y"))
  (Second (Var "y"))
  )
 
-test' = (Lam "v" (Sum (Var "v") (Lit (LInt 1))))
+test' = (Lam "v" (Sum (Var "v") (LInt 1)))
 
 test'' = (LetIn "funzione"
-          (Lam "e" (Lit(LInt 2)) )
-          (App (Lam "v" (App (Var "v") ((Lit (LInt 1))))) (Var "funzione") )
+          (Lam "e" (LInt 2) )
+          (App (Lam "v" (App (Var "v") ((LInt 1)))) (Var "funzione") )
          )
 
 envy = insertEnv "x" (VI 1) (emptyEnv)
@@ -25,23 +25,22 @@ envy' = insertEnv "y" ( VP ((VI 5),(VI 6)) ) (envy)
 
 testrec =
  (App
-  (Rec "rec" (Lam "x" (IfThenElse (Var "x") (Lit (LInt 1)) (Mul(Var "x")(App (Var "rec")(Sub (Var "x")(Lit(LInt 1))))) )))
-  (Lit (LInt 10))
+  (Rec "rec" (Lam "x" (IfThenElse (Var "x") (LInt 1) (Mul(Var "x")(App (Var "rec")(Sub (Var "x")(LInt 1)))) )))
+  (LInt 10)
  )
 
 fattoriale =
- (Rec "rec" (Lam "x" (IfThenElse (Var "x") (Lit (LInt 1)) (Mul(Var "x")(App (Var "rec")(Sub (Var "x")(Lit(LInt 1))))) )))
+ (Rec "rec" (Lam "x" (IfThenElse (Var "x") (LInt 1) (Mul(Var "x")(App (Var "rec")(Sub (Var "x")(LInt 1)))) )))
 
 test_fattoriale =
  putStrLn $ show $ appPL fattoriale [(VI 4), (VI 5), (VI 6)]
 
 pairFunction =
  (LetIn "c"
-  (Lit (LInt 10))
+  (LInt 10)
   (Rec "rec" (Lam "pair" (IfThenElse (First (Var "pair"))
                                      (Var "pair")
-                                     (App (Var "rec") (Lit $ LPair (Sub(First (Var "pair"))(Lit(LInt 1))) (Second (Var "pair"))))
-                         )
+                                     (App (Var "rec") (LPair (Sub(First (Var "pair"))(LInt 1)) (Second (Var "pair")))))
              )
   )
  )
@@ -49,7 +48,7 @@ pairFunction =
 test_pair = putStrLn $ show $ appPL pairFunction [(VP (VI 1, VI 3))]
 
 t_function =
- (Lam "f" (App (Var "f") (Lit (LInt 10))))
+ (Lam "f" (App (Var "f") (LInt 10)))
 
 fa (VI x)= Just (VI 666)
 fb (VI x)= Nothing
@@ -59,7 +58,7 @@ test_function = putStrLn $ show $ appPL t_function [(VF fa), (VF fb), (VF fc)]
 
 
 --test per appPL
-programma = (Lam "fun" (App (Var "fun") (Lit(LInt 5))) )
+programma = (Lam "fun" (App (Var "fun") (LInt 5)) )
 --parametri tau da fornire ad appPL
 funA = VF (\y -> case y of
                VI n -> Just $ VI (n + 3)
