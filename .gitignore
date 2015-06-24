@@ -7,6 +7,8 @@ l-dev
 *~
 
 relazione/main-blx.bib
+relazione/main.bbl
+*.blg
 *.aux
 *.pdf
 *.log
