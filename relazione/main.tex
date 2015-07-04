@@ -33,8 +33,18 @@
 \maketitle
 
 \section{Introduzione}
-In questo documento vengono presentati dei moduli haskell per il calcolo  con un linguaggio eager di ordine superiore, seguendo la sua semantica operazionale e denotazionale, nonché alcune scelte di implementazione e progettazione degli stessi.
+In questo documento vengono presentati dei moduli Haskell per il calcolo  con un linguaggio eager di ordine superiore, seguendo la sua semantica operazionale e denotazionale, nonché alcune scelte di implementazione e progettazione degli stessi.
 
+L'idea è quella di implementare uno strumento automatico per il calcolo della semantica di un linguaggio, in particolare il linguaggio presentato nel libro~\cite{Winskel}al capitolo 11. Lo strumento dovrà sostanzialmente essere in grado di:
+
+\begin{itemize}
+	\item Operare come un interprete seguendo le semantiche descritte da Winskell, interpretare del codice del linguaggio, calcolarne i valori dove possibile, seguendo la semantica operazionale.
+	\item Fornire la semantica denotazionale di un programma scritto nel linguaggio eager, e possibilmente poter rappresentare l'elemento bottom che indica la divergenza di un programma.
+	\item Testare la semantica denotazionale di un programma su diversi valori forniti, che possono essere anche divergenti.
+	\item Calcolare delle approssimazioni di funzioni ricorsive del linguaggio, sfruttando il calcolo del punto fisso tramite iterazioni partendo dall'elemento bottom.
+	\item Dare una rappresentazione alternativa delle approssimazioni e delle funzioni tramite liste di coppie, definire le operazioni.
+\end{itemize}
+Inoltre, data la possibilità della semantica denotazionale di gestire la rappresentazione di un programma che diverge, può essere interessante riuscire a gestire la divergenza, ad esempio potersi accorgere per qualche caso particolare se il programma diverge.
 
 Nella sezione~\ref{sec:operational} si descrive l'interprete del linguaggio, implementato seguendo le definizioni della semantica operazionale del linguaggio, con particolare accento sulle difficoltà di implementazione di un interprete del lambda calcolo. Proprio per quest'ultima problematica viene quindi richiamata la nozione della macchina di Landin, un programma che simula una macchina a registri per l'interpretazione del lambda calcolo.
 
@@ -78,8 +88,8 @@ In questo documento non verrà utilizzata alcuna regola del type system, verrann
 
 Per ulteriori informazioni sulle regole del type system si faccia affidamento al capitolo 11 di \cite{Winskel}.%winskel
 
-\paragraph{Rappresentazione della sintassi in haskell}
-Nel modulo \texttt{Syntax.hs} è presente la rappresentazione della sintassi del linguaggio in haskell.
+\paragraph{Rappresentazione della sintassi in Haskell}
+Nel modulo \texttt{Syntax.hs} è presente la rappresentazione della sintassi del linguaggio in Haskell.
 
 \texttt{Expr} è il datatype rappresentante i termini, sono presenti tutti i costrutti del linguaggio eager.
 
@@ -174,35 +184,12 @@ t_{1} \rightarrow^{e} c_{1} \quad t_{2}[c_{1}/x] \rightarrow^{e} c_{2}
 
 Nel modulo LamUntiped.hs è stato sviluppato un interprete per calcolare i termini  del linguaggio e valutarli in valori. I valori ottenibili possono essere valori interi, valori coppia o lambda astrazioni che rappresentano delle funzioni che non sono applicate.
 
-La valutazione dei termini non risulta particolarmente difficile, in haskell la semantica risulta immediata, specialmente se ci si affida all'utilizzo del lambda calcolo di haskell.
+La valutazione dei termini non risulta particolarmente difficile, in Haskell la semantica risulta immediata, specialmente se ci si affida all'utilizzo del lambda calcolo di Haskell.
 
 Nel modulo si è voluto invece implementare anche un meccanismo di calcolo per le espressioni del lambda calcolo, lo spunto per l'implementazione è ottenuto dalla macchina di Landin.
 
-\paragraph{La macchina di Landin (SECD machine)}
-È la prima macchina astratta per ridurre le espressioni del lambda calcolo, inventata da P. J. Ladin. La macchina è basata su 4 \emph{registri} contenenti le informazioni necessarie alla valutazione dell'espressione. Questi registri puntano a delle \emph{linked-list} in memoria.
-
-Inizialmente la SECD machine viene presentata nel 1963 da Landin e successivamente pubblicata nel 64 (~\cite{LandinPJ}) lasciando molte scelte implementative aperte. Più tardi la macchina verrà presentata e implementata più in dettaglio da Peter Henderson (\cite{Henderson}) e successivamente fu sviluppata anche una versione hardware dall'università di Calgari (\cite{DesIsu}).
-
-\begin{itemize}
-\item \textbf{S} è un registro che punta al top di una pila (\textbf{Stack}), le funzioni prenderanno argomenti e torneranno il risultato in questa pila.
-\item \textbf{E} punta ad una lista lista di liste \textbf{Environment}, ogni lista rappresenta un livello dell'ambiente che contiene gli argomenti passati alle funzioni, e anche i valori all'interno dello scope della funzione.
-Gli argomenti della funzione sono nel capo della lista, variabili libere ma legate dalle funzioni "vicine" alla funzione sono negli altri elementi della lista.
-\item \textbf{C}, punta alle istruzioni della macchina (in particolare alla testa della lista chiamata Control o \textbf{Code}), eseguire queste istruzioni permette di cambiare tutti i registri della macchina (incluso Code), l'istruzione in posizione TOP è quella da eseguire, si continua ad eseguire istruzioni fino al raggiungimento di STOP nello stack.
-\item \textbf{D} punta alla testa della lista \textbf{Dump} tiene le copie dei registri, in modo da permettere istruzioni come jump, senza perdere i contesti d'esecuzione precedenti.
-\end{itemize}
-
-\paragraph{Descrizione del funzionamento della SECD machine:}
-Quando la valutazione dell'espressione inizia, l'espressione è caricata come unico elemento di Code. Environment, Stack e Dump sono vuoti.
-Durante la valutazione, il contenuto di Code viene convertito in notazione polacca inversa, con unico operatore \textbf{ap} (per applicazione).
-Ad esempio, l'espressione $F ( G X )$ diventa $X:G:ap:F:ap$.
-La valutazione avviene similmente alle altre espressioni in notazione polacca inversa.
-Se il primo elemento in Code è un valore, questo viene messo in Stack. Se l'oggetto era un identificatore, l'oggetto messo nello stack è legato all'identificatore nell'ambiente corrente in Environment. Se l'elemento era una astrazione, è costruita una chiusura per preservare i bindings delle sue variabili libere (che sono in Environment), e la chiusura viene messa nello stack.
-Se l'elemento è una $ap$, due valori sono estratti da Stack, e la applicazione viene effettuata (primo applicato al secondo). Se il risultato della applicazione è un valore, viene messo in Stack.
-Se l'applicazione è di una astrazione su un valore, il risultato nel lambda calcolo può essere comunque una applicazione (invece che un valore), quindi non può essere buttato in Stack, in questo caso il contenuto di Stack, Environment e Code viene salvato in Dump (che è uno stack che accetta triple), Stack viene svuotato, Code è reinizializzato al risultato dell'applicazione, con Environment contenente l'ambiente con le variabili libere dell'espressione, aumentato con i binding al risultato della applicazione.
-La valutazione continua in questo modo, se Code e Dump restano vuoti, la valutazione è completata e il risultato è in Stack.
-
-\paragraph{Implementazione del modulo haskell}
-Nel modulo haskell viene implementato un interprete per il linguaggio, segue le regole della semantica operazionale, e per i termini riguardanti il lambda calcolo vengono valutati ispirandosi in parte alla macchina di Landin.
+\paragraph{Implementazione del modulo Haskell}
+Nel modulo Haskell viene implementato un interprete per il linguaggio, segue le regole della semantica operazionale, e per i termini riguardanti il lambda calcolo vengono valutati ispirandosi in parte alla macchina di Landin, che viene brevemente illustrata in appendice~\ref{sec:landin}.
 
 In particolare ogni qual volta ci si trova a ridurre un valore lambda astrazione esso verrà rappresentato come una chiusura la quale comprende oltre al termine tutti i binding al suo ambiente. Questa operazione ricorda in parte l'utilizzo del registro D nella SECD machine per salvare un intero termine con tutto il suo Environment.
 
@@ -335,7 +322,7 @@ la funzione Cond risulta essere continua.
 \paragraph{Implementazione}
 Nel modulo \emph{Denotational.hs} è riportata l'implementazione della semantica denotazionale.
 
-Per rappresentare l'elemento bottom viene fatto uso della monade Maybe durante il calcolo della semantica, l'elemento \texttt{Nothing} indica bottom, in questo modo è direttamente rappresentato, le operazioni di lifting seguono il binding della monade Maybe di haskell.
+Per rappresentare l'elemento bottom viene fatto uso della monade Maybe durante il calcolo della semantica, l'elemento \texttt{Nothing} indica bottom, in questo modo è direttamente rappresentato, le operazioni di lifting seguono il binding della monade Maybe di Haskell.
 
 La funzione \texttt{denote} calcola la semantica denotazionale dato il termine e l'ambiente. Per poter testare una semantica denotazionale, di una funzione, su una lista di valori, che possono anche divergere, viene fornita la funzione \texttt{appPL}, essa prende un termine e una lista di elementi in \texttt{Tau}. Gli elementi in \texttt{Tau} sono i valori e possono rappresentare Interi, coppie e funzioni parziali.
 Grazie a \texttt{appPL} si è in grado di poter testare un termine solo in alcuni punti ed eventualmente osservare come si comporta se diamo in pasto delle funzioni parziali che possono tornare bottom in alcuni punti.
@@ -348,7 +335,7 @@ In questa parte di implementazione si prende una parte ristretta del linguaggio 
 
 L'intenzione è quella di poter rappresentare le funzioni e funzioni parziali come liste di coppie. Le coppie indicano con il primo elemento l'argomento preso dalla funzione, e con il secondo il valore della funzione in quel punto. Una lista vuota rappresenta l'elemento bottom.
 
-Segue la definizione del datatype in haskell per rappresentare le approssimazioni come lista di coppie.
+Segue la definizione del datatype in Haskell per rappresentare le approssimazioni come lista di coppie.
 
 \begin{verbatim}
 data Approximation = 
@@ -358,7 +345,7 @@ data Approximation =
 
 Ovviamente le approssimazioni possono avere una struttura innestata per rappresentare funzioni che prendono più argomenti o funzioni che prendono funzioni come input.
 
-Si sfrutta quindi la \emph{valutazione lazy} di haskell per ottenere la rappresentazione tramite liste infinite.
+Si sfrutta quindi la \emph{valutazione lazy} di Haskell per ottenere la rappresentazione tramite liste infinite.
 Per evitare una esecuzione infinita durante la stampa a schermo di una approssimazione è stata implementata la funzione \texttt{filter2show :: Approximation -> Approximation} che filtra solo i primi 5 elementi della lista-approssimazione in modo da poter avere un'idea generale dell'approssimazione calcolata.
 
 Anche in questo caso per la gestione delle variabili libere si utilizza un ambiente del tipo \texttt{type Environment = Map.Map Name Approximation}.
@@ -449,7 +436,7 @@ Grazie alla funzione \texttt{muuu} è tecnicamente possibile trovare il punto fi
 
 I moduli riguardanti la semantica operazionale e denotazionale fanno ciò che ci si aspetta facciano: seguono esattamente la semantica del linguaggio.
 
-Le uniche problematiche sono state la implementazione nel caso della semantica operazionale di un opportuno lambda calcolo, che comunque resta abbastanza indipendente e separato dalle altre regole della semantica operazionale. Con meno sforzi sarebbe stato possibile utilizzare il lambda-calcolo di haskell ottenendo gli stessi risultati.
+Le uniche problematiche sono state la implementazione nel caso della semantica operazionale di un opportuno lambda calcolo, che comunque resta abbastanza indipendente e separato dalle altre regole della semantica operazionale. Con meno sforzi sarebbe stato possibile utilizzare il lambda-calcolo di Haskell ottenendo gli stessi risultati.
 
 Nel caso denotazionale, c'è una diretta corrispondenza tra le regole e l'implementazione.
 Grazie alla funzione \texttt{appPL} è possibile testare una denotazione di un programma con altri valori, che non necessariamente devono essere funzioni definite ovunque, ma possono tornare anche valore $\perp$.
@@ -463,7 +450,31 @@ Nel caso denotazionale e delle approssimazioni si sperava nella possibilità di 
 Possibili sviluppi potrebbero essere fatti sul calcolo delle approssimazioni, che per ora restano ad uno stato molto prototipale. Come prima cosa si potrebbe aggiornare le approssimazioni con la costruzione di coppie di valore, senza troppa fatica, inoltre aggiungere l'ordine superiore, ma in questo caso potrebbero insorgere nuove numerose problematiche: si pensi che le coppie nelle liste-approssimazioni potrebbero avere come primo elemento di ogni coppia delle liste infinite a loro volta, rappresentanti una funzione presa in input come argomento. A questo punto sarebbe necessario poter enumerare tutte le funzioni possibili, inoltre al momento dell'applicazione sarebbe opportuno scegliere la corretta lista infinita sul primo elemento delle coppie e selezionare il secondo elemento. A quel punto è necessaria una gestione delle liste infinite.
 
 
-%\appendix
+\appendix
+
+\section{La macchina di Landin (SECD machine)}
+\label{sec:landin}
+È la prima macchina astratta per ridurre le espressioni del lambda calcolo, inventata da P. J. Ladin. La macchina è basata su 4 \emph{registri} contenenti le informazioni necessarie alla valutazione dell'espressione. Questi registri puntano a delle \emph{linked-list} in memoria.
+
+Inizialmente la SECD machine viene presentata nel 1963 da Landin e successivamente pubblicata nel 64 (~\cite{LandinPJ}) lasciando molte scelte implementative aperte. Più tardi la macchina verrà presentata e implementata più in dettaglio da Peter Henderson (\cite{Henderson}) e successivamente fu sviluppata anche una versione hardware dall'università di Calgari (\cite{DesIsu}).
+
+\begin{itemize}
+	\item \textbf{S} è un registro che punta al top di una pila (\textbf{Stack}), le funzioni prenderanno argomenti e torneranno il risultato in questa pila.
+	\item \textbf{E} punta ad una lista lista di liste \textbf{Environment}, ogni lista rappresenta un livello dell'ambiente che contiene gli argomenti passati alle funzioni, e anche i valori all'interno dello scope della funzione.
+	Gli argomenti della funzione sono nel capo della lista, variabili libere ma legate dalle funzioni "vicine" alla funzione sono negli altri elementi della lista.
+	\item \textbf{C}, punta alle istruzioni della macchina (in particolare alla testa della lista chiamata Control o \textbf{Code}), eseguire queste istruzioni permette di cambiare tutti i registri della macchina (incluso Code), l'istruzione in posizione TOP è quella da eseguire, si continua ad eseguire istruzioni fino al raggiungimento di STOP nello stack.
+	\item \textbf{D} punta alla testa della lista \textbf{Dump} tiene le copie dei registri, in modo da permettere istruzioni come jump, senza perdere i contesti d'esecuzione precedenti.
+\end{itemize}
+
+\paragraph{Descrizione del funzionamento della SECD machine:}
+Quando la valutazione dell'espressione inizia, l'espressione è caricata come unico elemento di Code. Environment, Stack e Dump sono vuoti.
+Durante la valutazione, il contenuto di Code viene convertito in notazione polacca inversa, con unico operatore \textbf{ap} (per applicazione).
+Ad esempio, l'espressione $F ( G X )$ diventa $X:G:ap:F:ap$.
+La valutazione avviene similmente alle altre espressioni in notazione polacca inversa.
+Se il primo elemento in Code è un valore, questo viene messo in Stack. Se l'oggetto era un identificatore, l'oggetto messo nello stack è legato all'identificatore nell'ambiente corrente in Environment. Se l'elemento era una astrazione, è costruita una chiusura per preservare i bindings delle sue variabili libere (che sono in Environment), e la chiusura viene messa nello stack.
+Se l'elemento è una $ap$, due valori sono estratti da Stack, e la applicazione viene effettuata (primo applicato al secondo). Se il risultato della applicazione è un valore, viene messo in Stack.
+Se l'applicazione è di una astrazione su un valore, il risultato nel lambda calcolo può essere comunque una applicazione (invece che un valore), quindi non può essere buttato in Stack, in questo caso il contenuto di Stack, Environment e Code viene salvato in Dump (che è uno stack che accetta triple), Stack viene svuotato, Code è reinizializzato al risultato dell'applicazione, con Environment contenente l'ambiente con le variabili libere dell'espressione, aumentato con i binding al risultato della applicazione.
+La valutazione continua in questo modo, se Code e Dump restano vuoti, la valutazione è completata e il risultato è in Stack.
 
 %\section{sorgenti Haskell}
 
