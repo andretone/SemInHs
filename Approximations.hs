@@ -20,14 +20,14 @@ data Approximation =
 Funzione ausiliaria per "tagliare" le liste e visualizzare solo
 una porzione della lista infinita
 -}
-filter2show :: Approximation -> Approximation
-filter2show (N i) = N i
-filter2show (A ax) = A 
+filter2show :: Int -> Approximation -> Approximation
+filter2show int (N i) = N i
+filter2show int (A ax) = A 
  (filter 
   (filterBottoms) 
   ( map 
-     (\(sx,dx) -> ((filter2show sx) ,(filter2show dx)))
-     (take 5 ax)
+     (\(sx,dx) -> ((filter2show int sx) ,(filter2show int dx)))
+     (take int ax)
   )
  )
  where
