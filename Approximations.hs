@@ -11,20 +11,20 @@ il comportamento di una funzione
 
 data Approximation = 
  N Integer |
- A [(Approximation,Approximation)]
+ F [(Approximation,Approximation)]
  deriving (Eq)
 
 --per ora omettiamo le coppie!!
 instance Show Approximation where
  show (N int) = "n:" ++ (show (n2Int int))
- show (A a) = "a:" ++ show a
+ show (F a) = "fun:" ++ show a
 {-
 Funzione ausiliaria per "tagliare" le liste e visualizzare solo
 una porzione della lista infinita
 -}
 filter2show :: Int -> Approximation -> Approximation
 filter2show int (N i) = N i
-filter2show int (A ax) = A 
+filter2show int (F ax) = F 
  (filter 
   (filterBottoms) 
   ( map 
@@ -34,7 +34,7 @@ filter2show int (A ax) = A
  )
  where
   filterBottoms :: (Approximation,Approximation) -> Bool
-  filterBottoms ( _ , (A [] ) ) = False
+  filterBottoms ( _ , (F [] ) ) = False
   filterBottoms  _  = True
 
 
@@ -100,23 +100,23 @@ modifyEnv v x rho = Map.insert x v rho
 approx :: Expr -> Environment -> Approximation
 approx (LInt n) = \e -> (int2Enum n)
 
-approx (Var name) = \e -> if member name e then (e Map.! name) else A []
---il bottom come una lista vuota: A []
+approx (Var name) = \e -> if member name e then (e Map.! name) else F []
+--il bottom come una lista vuota: F []
 
 approx (Sum e1 e2) = \e -> pluslift (approx e1 e) (approx e2 e)
  where
   pluslift aa@(N a) bb@(N b) = enumSum aa bb
-  pluslift _ _ = A [] --caso in cui non posso fare la somma
+  pluslift _ _ = F [] --caso in cui non posso fare la somma
 
 approx (Sub e1 e2) = \e -> sublift (approx e1 e) (approx e2 e)
  where
   sublift aa@(N a) bb@(N b) = enumSub aa bb
-  sublift _ _ = A [] --caso in cui non posso fare la sottrazione
+  sublift _ _ = F [] --caso in cui non posso fare la sottrazione
 
 approx (Mul e1 e2) = \e -> mullift (approx e1 e) (approx e2 e)
  where
   mullift aa@(N a) bb@(N b) = enumMul aa bb
-  mullift _ _ = A [] --caso in cui non posso fare la mul
+  mullift _ _ = F [] --caso in cui non posso fare la mul
 
 {-
 Per una lambda astrazione la sua approssimazione è una lista di coppie,
@@ -129,7 +129,7 @@ La laziness di haskell ci permette di poter costruire queste liste infinite
 e di non dover calcolare il valore per ogni coppia se non strettamente
 necessario.
 -}
-approx (Lam name expr) = \e -> A $ map ((funzioncina)e) [0..]
+approx (Lam name expr) = \e -> F $ map ((funzioncina)e) [0..]
  where funzioncina = \e -> \n -> ( N n , ((approx expr) (insertEnv name (N n) e)) )
 
 {-
@@ -141,19 +141,19 @@ Il risultato è il secondo elemento della coppia selezionata.
 approx (App t1 t2) = \e -> searchAprx (approx t1 e) (approx t2 e)
  where
   searchAprx :: Approximation -> Approximation -> Approximation
-  searchAprx (A ((a, y):ax)) x =
-   if a == x then y else searchAprx (A ax) x
-  searchAprx (A []) _ = A []
-  searchAprx _ (A []) = A []
+  searchAprx (F ((a, y):ax)) x =
+   if a == x then y else searchAprx (F ax) x
+  searchAprx (F []) _ = F []
+  searchAprx _ (F []) = F []
 
 approx (IfThenElse e1 e2 e3) = \e -> (cond (approx e1 e) e2 e3) e
  where
   cond :: Approximation -> Expr -> Expr -> Environment -> Approximation
-  cond (A _) _ _ = \e -> A []
+  cond (F _) _ _ = \e -> F []
   cond (N n) th el 
    | n == 0 = approx th
    | n /= 0 =  approx el
-   | otherwise = \e -> A []
+   | otherwise = \e -> F []
 
 approx (LetIn name e1 e2) = \e -> ((approx e2) (insertEnv name ((approx e1) e) e))
 
@@ -176,7 +176,7 @@ Questa funzione può essere utile per il calcolo dei punti fissi.
 -}
 muuu :: Expr -> Environment -> [ Approximation ]
 muuu (Rec y (Lam x t)) e =
- iterate ff (A [])
+ iterate ff (F [])
  where
   ff = \fi -> approx (Lam x t) (insertEnv y fi e) --fi e' l'approssimazione precedente
 muuu _ _ = error "muuu accepts only Rec-terms"
