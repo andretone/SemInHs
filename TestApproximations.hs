@@ -15,4 +15,4 @@ testmuu = take 6 ( muuu fact emptyEnv )
 
 main = do
  putStrLn $ show $ map (filter2show 8) testmuu
- putStrLn $ show $ filter2show 8 $ ( approx testrec emptyEnv )
+ putStrLn $ show $ filter2show 8 $ ( denote' testrec emptyEnv )

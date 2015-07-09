@@ -97,23 +97,23 @@ modifyEnv v x rho = Map.insert x v rho
 
 --proviamo a rappresentare alcune funzioni
 
-approx :: Expr -> Environment -> Approximation
-approx (LInt n) = \e -> (int2Enum n)
+denote' :: Expr -> Environment -> Approximation
+denote' (LInt n) = \e -> (int2Enum n)
 
-approx (Var name) = \e -> if member name e then (e Map.! name) else F []
+denote' (Var name) = \e -> if member name e then (e Map.! name) else F []
 --il bottom come una lista vuota: F []
 
-approx (Sum e1 e2) = \e -> pluslift (approx e1 e) (approx e2 e)
+denote' (Sum e1 e2) = \e -> pluslift (denote' e1 e) (denote' e2 e)
  where
   pluslift aa@(N a) bb@(N b) = enumSum aa bb
   pluslift _ _ = F [] --caso in cui non posso fare la somma
 
-approx (Sub e1 e2) = \e -> sublift (approx e1 e) (approx e2 e)
+denote' (Sub e1 e2) = \e -> sublift (denote' e1 e) (denote' e2 e)
  where
   sublift aa@(N a) bb@(N b) = enumSub aa bb
   sublift _ _ = F [] --caso in cui non posso fare la sottrazione
 
-approx (Mul e1 e2) = \e -> mullift (approx e1 e) (approx e2 e)
+denote' (Mul e1 e2) = \e -> mullift (denote' e1 e) (denote' e2 e)
  where
   mullift aa@(N a) bb@(N b) = enumMul aa bb
   mullift _ _ = F [] --caso in cui non posso fare la mul
@@ -129,8 +129,8 @@ La laziness di haskell ci permette di poter costruire queste liste infinite
 e di non dover calcolare il valore per ogni coppia se non strettamente
 necessario.
 -}
-approx (Lam name expr) = \e -> F $ map ((funzioncina)e) [0..]
- where funzioncina = \e -> \n -> ( N n , ((approx expr) (insertEnv name (N n) e)) )
+denote' (Lam name expr) = \e -> F $ map ((funzioncina)e) [0..]
+ where funzioncina = \e -> \n -> ( N n , ((denote' expr) (insertEnv name (N n) e)) )
 
 {-
 L'applicazione non fa altro che selezionare il giusto elemento dalla lista
@@ -138,7 +138,7 @@ approssimazione del primo termine, come chiave di ricerca utilizza il primo
 elemento della coppia di ogni elemento.
 Il risultato è il secondo elemento della coppia selezionata.
 -}
-approx (App t1 t2) = \e -> searchAprx (approx t1 e) (approx t2 e)
+denote' (App t1 t2) = \e -> searchAprx (denote' t1 e) (denote' t2 e)
  where
   searchAprx :: Approximation -> Approximation -> Approximation
   searchAprx (F ((a, y):ax)) x =
@@ -146,21 +146,21 @@ approx (App t1 t2) = \e -> searchAprx (approx t1 e) (approx t2 e)
   searchAprx (F []) _ = F []
   searchAprx _ (F []) = F []
 
-approx (IfThenElse e1 e2 e3) = \e -> (cond (approx e1 e) e2 e3) e
+denote' (IfThenElse e1 e2 e3) = \e -> (cond (denote' e1 e) e2 e3) e
  where
   cond :: Approximation -> Expr -> Expr -> Environment -> Approximation
   cond (F _) _ _ = \e -> F []
   cond (N n) th el 
-   | n == 0 = approx th
-   | n /= 0 =  approx el
+   | n == 0 = denote' th
+   | n /= 0 =  denote' el
    | otherwise = \e -> F []
 
-approx (LetIn name e1 e2) = \e -> ((approx e2) (insertEnv name ((approx e1) e) e))
+denote' (LetIn name e1 e2) = \e -> ((denote' e2) (insertEnv name ((denote' e1) e) e))
 
-approx (Rec name (Lam x t)) = \e -> 
- (approx (Lam x t) (insertEnv name (approx (Rec name (Lam x t)) e) e) )
+denote' (Rec name (Lam x t)) = \e -> 
+ (denote' (Lam x t) (insertEnv name (denote' (Rec name (Lam x t)) e) e) )
 
-approx _ = error "not implemeted yet"
+denote' _ = error "not implemeted yet"
 
 
 {-
@@ -178,7 +178,7 @@ muuu :: Expr -> Environment -> [ Approximation ]
 muuu (Rec y (Lam x t)) e =
  iterate ff (F [])
  where
-  ff = \fi -> approx (Lam x t) (insertEnv y fi e) --fi e' l'approssimazione precedente
+  ff = \fi -> denote' (Lam x t) (insertEnv y fi e) --fi e' l'approssimazione precedente
 muuu _ _ = error "muuu accepts only Rec-terms"
 --Anche un metodo per visualizzare le approssimazioni, 
 --scartando chi ha nel lato dx un bel bottom.
