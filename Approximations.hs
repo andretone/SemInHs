@@ -12,10 +12,12 @@ il comportamento di una funzione
 data Approximation = 
  N Integer |
  A [(Approximation,Approximation)]
- deriving (Show, Eq)
+ deriving (Eq)
 
 --per ora omettiamo le coppie!!
-
+instance Show Approximation where
+ show (N int) = "n:" ++ (show (n2Int int))
+ show (A a) = "a:" ++ show a
 {-
 Funzione ausiliaria per "tagliare" le liste e visualizzare solo
 una porzione della lista infinita
@@ -34,6 +36,46 @@ filter2show int (A ax) = A
   filterBottoms :: (Approximation,Approximation) -> Bool
   filterBottoms ( _ , (A [] ) ) = False
   filterBottoms  _  = True
+
+
+--interi enumerati
+
+int2Enum :: Integer -> Approximation
+int2Enum int = N $ int2N int
+
+lint2N :: Expr -> Approximation
+lint2N (LInt n) = int2Enum n
+lint2N _ = error "wrong argument"
+
+{-
+enumerare gli interi, dato un naturale
+torno un intero in Z
+-}
+n2Int :: Integer -> Integer
+n2Int n
+ | n >= 0 && odd n = (-(n+1))`div`2
+ | n >= 0 && even n = n`div`2
+ | otherwise = error "n2Int wrong argument"
+
+int2N :: Integer -> Integer
+int2N int
+ | int < 0 = (int*(-2))-1
+ | int >= 0 = int*2
+
+enumSum :: Approximation -> Approximation -> Approximation
+enumSum (N a) (N b) =
+ N $ int2N $ ((n2Int a) + (n2Int b))
+enumSum _ _ = error "wrong sum"
+
+enumSub :: Approximation ->Approximation ->Approximation
+enumSub (N a) (N b) =
+ N $ int2N $ ((n2Int a) - (n2Int b))
+enumSub _ _ = error "wrong sub"
+
+enumMul :: Approximation ->Approximation ->Approximation
+enumMul (N a) (N b) =
+ N $ int2N $ ((n2Int a) * (n2Int b))
+enumMul _ _ = error "wrong mul"
 
 {-
 Environment, una Map, (come negli altri moduli)
@@ -56,24 +98,24 @@ modifyEnv v x rho = Map.insert x v rho
 --proviamo a rappresentare alcune funzioni
 
 approx :: Expr -> Environment -> Approximation
-approx (LInt n) = \e -> N n
+approx (LInt n) = \e -> (int2Enum n)
 
 approx (Var name) = \e -> if member name e then (e Map.! name) else A []
 --il bottom come una lista vuota: A []
 
 approx (Sum e1 e2) = \e -> pluslift (approx e1 e) (approx e2 e)
  where
-  pluslift (N a) (N b) = N (a+b)
+  pluslift aa@(N a) bb@(N b) = enumSum aa bb
   pluslift _ _ = A [] --caso in cui non posso fare la somma
 
 approx (Sub e1 e2) = \e -> sublift (approx e1 e) (approx e2 e)
  where
-  sublift (N a) (N b) = N (a-b)
+  sublift aa@(N a) bb@(N b) = enumSub aa bb
   sublift _ _ = A [] --caso in cui non posso fare la sottrazione
 
 approx (Mul e1 e2) = \e -> mullift (approx e1 e) (approx e2 e)
  where
-  mullift (N a) (N b) = N (a*b)
+  mullift aa@(N a) bb@(N b) = enumMul aa bb
   mullift _ _ = A [] --caso in cui non posso fare la mul
 
 {-

@@ -14,5 +14,5 @@ fact = (Rec "rec" (Lam "x" (IfThenElse (Var "x") (LInt 1) (Mul(Var "x")(App (Var
 testmuu = take 6 ( muuu fact emptyEnv )
 
 main = do
- putStrLn $ show $ map filter2show testmuu
- putStrLn $ show $ filter2show $ ( approx testrec emptyEnv )
+ putStrLn $ show $ map (filter2show 8) testmuu
+ putStrLn $ show $ filter2show 8 $ ( approx testrec emptyEnv )
