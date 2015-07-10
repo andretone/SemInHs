@@ -67,6 +67,7 @@ denotationalSemOf ::Expr -> Maybe Tau
 denotationalSemOf t = denote t emptyEnv
 
 denote :: Expr -> Environment -> Maybe Tau
+denote Bottom = \e -> Nothing
 denote (Var x) = 
  \e -> if member x e then Just (e Map.! x) else Nothing
 

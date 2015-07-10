@@ -80,12 +80,12 @@ consultare TestSemDenotazionale.hs per altri esempi.
 
 --APPROSSIMAZIONI:
 attenzione a non generare liste infinite! (usare la funzione take sulle liste per limitare i risultati)
-viene fornita anche filter2show, che tronca le liste ai primi 5 elmti.
+viene fornita anche filter2show, che tronca le liste ai primi n elmti.
 
 ..> :l Appproximation.hs
 
 ..> :m + Syntax
 
-..>filter2show $ ( approx (Lit (LInt 4)) emptyEnv )
+..>filter2show 8 $ ( denote' (Lit (LInt 4)) emptyEnv )
 
 N 4
