@@ -3,7 +3,8 @@ module Syntax where
  type Name = (String) 
 
  data Expr
-  = Var Name
+  = Bottom
+  | Var Name
   | LInt Integer
   | LPair Expr Expr
   | App Expr Expr
@@ -15,7 +16,7 @@ module Syntax where
   deriving (Eq)
 
  instance Show Expr where
---   show Bottom = "_|_"
+   show Bottom = "_|_"
    show (Var n) = show n
    show (LInt i) = show i
    show (LPair e1 e2) = show (e1, e2)

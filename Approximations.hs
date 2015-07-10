@@ -98,6 +98,8 @@ modifyEnv v x rho = Map.insert x v rho
 --proviamo a rappresentare alcune funzioni
 
 denote' :: Expr -> Environment -> Approximation
+denote' Bottom = \e -> F[]
+
 denote' (LInt n) = \e -> (int2Enum n)
 
 denote' (Var name) = \e -> if member name e then (e Map.! name) else F []
