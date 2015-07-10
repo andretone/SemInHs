@@ -259,6 +259,8 @@ Nel caso si voglia visualizzare il risultato di una valutazione di una lambda as
 \label{sec:denotational}
 La semantica denotazionale del linguaggio è definita tramite induzione strutturale sui termini.
 
+Per convenienza e per poter testare i modo più interessante la semantica denotazionale del linguaggio, alla sintassi è stato aggiunto il termine Bottom, ossia un termine che diverge. L'intenzione è quella di sfruttare il vantaggio della semantica denotazionale rispetto la semantica operazionale che è proprio quello di poter rappresentare la divergenza.
+
 La semantica denotazionale lavora su i CPO, segue qui sotto la definizione dei CPO per il nostro linguaggio che corrispondono ai domini dei tipi:
 
 \begin{gather*}
@@ -270,6 +272,8 @@ V^{e}_{\tau_{1} \rightarrow \tau_{2}} = [V^{e}_{\tau_{1}} \rightarrow (V^{e}_{\t
 \\
 \end{gather*}
 
+Si noti che a differenza dal linguaggio definito da Winskel che è tipato in questo caso si possono costruire termini anche non propriamente corretti e che portano in domini più grandi rispetto un linguaggio tipato (si pensi ad un ramo \emph{if-then-else} che può ritornare un numero o una coppia a seconda della condizione).
+
 In generale i termini contengono variabili libere, la semantica denotazionale richiede la nozione di ambiente:
 $$
 \rho : \mathbf{Var} \rightarrow \cup \{ V^{e}_\tau \| \tau \ a \ type \}
@@ -278,6 +282,7 @@ Il quale rispetta i tipi:
 $$
 x : \tau \Rightarrow \rho ( x ) \in V^{e}_{\tau}
 $$
+
 Le regole della semantica denotazionale sono riportate infine nella figura~\ref{fig:sem-den}.
 
 \begin{figure}[!t]
@@ -338,7 +343,9 @@ Nel modulo \emph{Denotational.hs} è riportata l'implementazione della semantica
 
 Per rappresentare l'elemento bottom viene fatto uso della monade Maybe durante il calcolo della semantica, l'elemento \texttt{Nothing} indica bottom, in questo modo è direttamente rappresentato, le operazioni di lifting seguono il binding della monade Maybe di Haskell.
 
-La funzione \texttt{denote} calcola la semantica denotazionale dato il termine e l'ambiente. Per poter testare una semantica denotazionale, di una funzione, su una lista di valori, che possono anche divergere, viene fornita la funzione \texttt{appPL}, essa prende un termine e una lista di elementi in \texttt{Tau}. Gli elementi in \texttt{Tau} sono i valori e possono rappresentare Interi, coppie e funzioni parziali.
+La funzione \texttt{denote} calcola la semantica denotazionale dato il termine e l'ambiente. Essendo il nostro linguaggio non tipato possono essere costruiti dei termini senza senso (come operazioni aritmetiche su termini non numerici), in questo caso durante il calcolo della semantica denotazionale, potranno essere sollevate delle eccezioni che indicano che il termine non è stato costruito in modo adeguato.
+
+Per poter testare una semantica denotazionale, di una funzione, su una lista di valori, che possono anche divergere, viene fornita la funzione \texttt{appPL}, essa prende un termine e una lista di elementi in \texttt{Tau}. Gli elementi in \texttt{Tau} sono i valori e possono rappresentare Interi, coppie e funzioni parziali.
 Grazie a \texttt{appPL} si è in grado di poter testare un termine solo in alcuni punti ed eventualmente osservare come si comporta se diamo in pasto delle funzioni parziali che possono tornare bottom in alcuni punti.
 
 %sarebbe bello qualcosa di più sul bottom = Nothing
@@ -346,6 +353,7 @@ Grazie a \texttt{appPL} si è in grado di poter testare un termine solo in alcun
 \section{Calcolo di approssimazioni tramite liste}
 \label{sec:approximations}
 In questa parte di implementazione si prende una parte ristretta del linguaggio eager dove viene tolta la possibilità di costruire le coppie.
+Quindi manteniamo solo la possibilità di approssimare funzioni non di ordine superiore, e solo con numeri interi. Questa scelta é motivata dal fatto che con l'introduzione delle coppie oltre ad introdurre la necessità di una enumerazione delle coppie (da coppie a naturali), é necessario allegare ad ogni variabile il suo tipo oppure introdurre delle regole per determinare il tipo delle variabili e dei termini. Inoltre l'introduzione di funzioni di ordine superiore rende necessario enumerare tutte le funzioni possibili, una problematica non immediata.
 
 L'intenzione è quella di poter rappresentare le funzioni e funzioni parziali come liste di coppie. Le coppie indicano con il primo elemento l'argomento preso dalla funzione, e con il secondo il valore della funzione in quel punto. Una lista vuota rappresenta l'elemento bottom.
 
@@ -364,19 +372,19 @@ Per evitare una esecuzione infinita durante la stampa a schermo di una approssim
 
 Anche in questo caso per la gestione delle variabili libere si utilizza un ambiente del tipo \texttt{type Environment = Map.Map Name Approximation}.
 
-Nel sorgente \texttt{Approximations.hs} la funzione \texttt{approx :: Expr -> Environment -> Approximation} viene implementata seguendo l'idea della costruzione di una approssimazione, in particolare si esamini i seguenti due casi:
+Nel sorgente \texttt{Approximations.hs} la funzione \texttt{denote' :: Expr -> Environment -> Approximation} viene implementata seguendo l'idea della costruzione di una approssimazione, in particolare si esamini i seguenti due casi:
 
 \begin{verbatim}
-approx (Lam name expr) = 
+denote' (Lam name expr) = 
  \e -> A $ map ((funzioncina)e) [0..]
  where funzioncina = 
-  \e -> \n -> ( N n , ((approx expr) (insertEnv name (N n) e)) )
+  \e -> \n -> ( N n , ((denote' expr) (insertEnv name (N n) e)) )
 \end{verbatim}
 
 Dove per calcolare l'approssimazione di una lambda-astrazione si applicherà la funzione su tutti gli elementi del dominio degli interi, questo calcolo su tutto il dominio viene però fatto in modo lazy, col la filosofia della creazione delle liste infinite.
 
 \begin{verbatim}
-approx (App t1 t2) = \e -> searchAprx (approx t1 e) (approx t2 e)
+denote' (App t1 t2) = \e -> searchAprx (denote' t1 e) (denote' t2 e)
  where
   searchAprx :: Approximation -> Approximation -> Approximation
   searchAprx (A ((a, y):ax)) x =
@@ -396,7 +404,7 @@ muuu :: Expr -> Environment -> [ Approximation ]
 muuu (Rec y (Lam x t)) e =
  iterate ff (A [])
  where
-  ff = \fi -> approx (Lam x t) (insertEnv y fi e) 
+  ff = \fi -> denote' (Lam x t) (insertEnv y fi e) 
   --fi e' l'approssimazione precedente
 muuu _ _ = error "muuu accepts only Rec-terms"
 \end{verbatim}
@@ -408,7 +416,7 @@ muuu :: Expr -> Environment -> [ Approximation ]
 muuu (Rec y (Lam x t)) e =
  iterate ff (A [])
  where
-  ff = \fi -> approx (Lam x t) (insertEnv y fi e) 
+  ff = \fi -> denote' (Lam x t) (insertEnv y fi e) 
 muuu _ _ = error "muuu accepts only Rec-terms"
 \end{verbatim}
 
@@ -426,12 +434,12 @@ fact = (Rec "rec" (Lam "x" (ite
 Si esegua \texttt{muuu fact emptyEnv }:
 come prima approssimazione viene calcolata 
 \begin{verbatim}
-approx (Lam x (IfThenElse ...) ) (insertEnv "rec" A[] emptyEnv)
+denote' (Lam x (IfThenElse ...) ) (insertEnv "rec" A[] emptyEnv)
 \end{verbatim}
 la prima approssimazione riduce a \texttt{A [(N 0,N 1)]} poiché il fattoriale di 0 è calcolaile senza l'ausilio di chiamate ricorsive.
 Ora iterate calcolerà
 \begin{verbatim}
-approx (Lam x (IfThenElse ...) ) (insertEnv "rec" A [(N 0,N 1)] emptyEnv)
+denote' (Lam x (IfThenElse ...) ) (insertEnv "rec" A [(N 0,N 1)] emptyEnv)
 \end{verbatim}
 E si otterrà la seconda approssimazione \texttt{A [(N 0,N 1),(N 1,N 1)]}.
 Le iterazioni continuano seguendo questo ragionamento, creando una lista infinita:
