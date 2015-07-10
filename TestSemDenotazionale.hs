@@ -30,7 +30,15 @@ testrec =
  )
 
 fattoriale =
- (Rec "rec" (Lam "x" (IfThenElse (Var "x") (LInt 1) (Mul(Var "x")(App (Var "rec")(Sub (Var "x")(LInt 1)))) )))
+ (Rec "rec" 
+  (Lam "x" 
+   (IfThenElse
+    (App isPos (Var "x"))
+    (IfThenElse (Var "x") (LInt 1) (Mul(Var "x")(App (Var "rec")(Sub (Var "x")(LInt 1)))) )
+    (Bottom) --se negativo
+   )
+  )
+ )
 
 test_fattoriale =
  putStrLn $ show $ appPL fattoriale [(VI 4), (VI 5), (VI 6)]
@@ -77,3 +85,29 @@ tapp = appPL programma [funA , funB]
 tapp' = appPL fattoriale [VI 1, VI 2, VI 3]
 
 main = main''
+
+isPos =
+ (Lam "n"
+ (App
+ (App
+ (Rec "rec"
+  (Lam "x"
+   (Lam "y"
+    (IfThenElse (Var "x") (LInt (0))
+                         (IfThenElse (Var "y") (LInt (-1))
+                                               (App (App (Var "rec") (decx)) (incy))
+                         )
+    )
+   ) 
+  )
+ )
+ (Var "n")
+ )
+ (Var "n") 
+ )
+ )
+ 
+ where
+  decx = (Sub (Var "x") (LInt 1))
+  incy = (Sum (Var "y") (LInt 1))
+                                      
