@@ -1,7 +1,7 @@
 module Main where
 
 import Denotational
-import Syntax
+import Syntax hiding (Lam', T)
 
 main'' = putStrLn $ show $ denote testrec emptyEnv
 

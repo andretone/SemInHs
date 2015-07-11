@@ -1,7 +1,7 @@
 module Main where
 
 import LamUntyped
-import Syntax
+import Syntax hiding (Bottom, Lam', T)
 --TESTS
 anothertest =(Lam "q" (App (Lam "a" (Lam "b" (App (Var "b") (Var "a")))) (App (Lam "z" (Lam "c" (Var "c"))) (LInt 1) ) ) )
 

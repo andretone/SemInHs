@@ -10,7 +10,7 @@ module Denotational
 , appPL
 ) where
 
-import Syntax
+import Syntax hiding (Lam', T)
 
 import qualified Data.Map as Map
 import Data.Maybe

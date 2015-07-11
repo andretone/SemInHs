@@ -1,5 +1,10 @@
 module Syntax where
 
+ data T = Num
+        | Couple T T
+        | Function
+  deriving (Eq)
+
  type Name = (String) 
 
  data Expr
@@ -9,6 +14,7 @@ module Syntax where
   | LPair Expr Expr
   | App Expr Expr
   | Lam Name Expr
+  | Lam' Name T Expr
   | Sum Expr Expr | Sub Expr Expr | Mul Expr Expr
   | IfThenElse Expr Expr Expr
   | First Expr | Second Expr
@@ -22,6 +28,7 @@ module Syntax where
    show (LPair e1 e2) = show (e1, e2)
    show (App e1 e2) = "(" ++ show e1 ++ " " ++ show e2 ++ ")"
    show (Lam name expr) = "(" ++ " \\ " ++ show name ++ "." ++ show expr ++ ")"
+   show (Lam' name _  expr) = "(" ++ " \\ " ++ show name ++ "." ++ show expr ++ ")"
    show (Sum e1 e2) = show e1 ++ "+" ++ show e2
    show (Sub e1 e2) = show e1 ++ "-" ++ show e2
    show (Mul e1 e2) = show e1 ++ "*" ++ show e2

@@ -12,7 +12,7 @@ import System.IO
 
 import Debug.Trace
 
-import Syntax hiding (Bottom)
+import Syntax hiding (Bottom, Lam', T)
 
 --evaluation
 data Value
